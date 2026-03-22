@@ -16,7 +16,8 @@
                     _rooms[gameId] = new();
                 _connectionToPlayer[connectionId] = playerName;
                 _playerToConnection[playerName]   = connectionId;
-                _connectionToGame[connectionId]   = gameId; // NOUVEAU
+                _connectionToGame[connectionId]   = gameId;
+                _rooms[gameId][playerName]        = (0f, 0f); // ← AJOUT
             }
         }
 
