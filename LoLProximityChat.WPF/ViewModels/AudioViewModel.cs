@@ -9,7 +9,6 @@ namespace LoLProximityChat.WPF.ViewModels
     public class PlayerAudioEntry : INotifyPropertyChanged
     {
         public string Name { get; set; } = "";
-        
 
         private float _volume = 1f;
         public float Volume
@@ -39,8 +38,8 @@ namespace LoLProximityChat.WPF.ViewModels
             set { _isSpeaking = value; OnPropertyChanged(); }
         }
 
-        public int VolumePercent => (int)(_volume * 100);
-        public string MuteIcon  => _isMuted ? "🔇" : "🔊";
+        public int    VolumePercent => (int)(_volume * 100);
+        public string MuteIcon     => _isMuted ? "🔇" : "🔊";
 
         public event PropertyChangedEventHandler? PropertyChanged;
         private void OnPropertyChanged([CallerMemberName] string? n = null)
@@ -50,6 +49,7 @@ namespace LoLProximityChat.WPF.ViewModels
     public class AudioViewModel : INotifyPropertyChanged
     {
         public ObservableCollection<PlayerAudioEntry> Players { get; } = [];
+
         public int SelectedInputIndex  => InputDevices.IndexOf(SelectedInput);
         public int SelectedOutputIndex => OutputDevices.IndexOf(SelectedOutput);
 
@@ -71,14 +71,25 @@ namespace LoLProximityChat.WPF.ViewModels
             set { _selectedOutput = value; OnPropertyChanged(); }
         }
 
+        // ── Volume master ─────────────────────────────────────────────────────
+        private float _masterVolume = 1f;
+        public float MasterVolume
+        {
+            get => _masterVolume;
+            set { _masterVolume = value; OnPropertyChanged(); OnPropertyChanged(nameof(MasterVolumePercent)); MasterVolumeChanged?.Invoke(value); }
+        }
+        public int MasterVolumePercent => (int)(_masterVolume * 100);
+        public event Action<float>? MasterVolumeChanged;
+
         // ── Volume micro ──────────────────────────────────────────────────────
         private float _micVolume = 1f;
         public float MicVolume
         {
             get => _micVolume;
-            set { _micVolume = value; OnPropertyChanged(); OnPropertyChanged(nameof(MicVolumePercent)); }
+            set { _micVolume = value; OnPropertyChanged(); OnPropertyChanged(nameof(MicVolumePercent)); MicVolumeChanged?.Invoke(value); }
         }
         public int MicVolumePercent => (int)(_micVolume * 100);
+        public event Action<float>? MicVolumeChanged;
 
         // ── Mute micro ────────────────────────────────────────────────────────
         private bool _isMicMuted;
@@ -115,10 +126,7 @@ namespace LoLProximityChat.WPF.ViewModels
         }
 
         // ── Init ──────────────────────────────────────────────────────────────
-        public AudioViewModel()
-        {
-            LoadDevices();
-        }
+        public AudioViewModel() => LoadDevices();
 
         private void LoadDevices()
         {

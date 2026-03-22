@@ -33,9 +33,10 @@ namespace LoLProximityChat.WPF.Views
 
         protected override void OnClosed(EventArgs e)
         {
-            if (DataContext is MainViewModel vm)
-                vm.DisposeAsync().AsTask().Wait();
             base.OnClosed(e);
+            if (DataContext is MainViewModel vm)
+                _ = vm.DisposeAsync().AsTask(); // fire and forget, pas de Wait()
+            Environment.Exit(0); // force kill immédiat
         }
     }
 }

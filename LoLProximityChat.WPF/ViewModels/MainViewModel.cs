@@ -7,29 +7,36 @@ namespace LoLProximityChat.WPF.ViewModels
 {
     public class MainViewModel : INotifyPropertyChanged, IAsyncDisposable
     {
-        private readonly LiveApiPoller _poller = new();
+        private readonly LiveApiPoller _poller  = new();
         private readonly SignalRClient _signalR = new(AppConfig.Load().ServerUrl);
-        public AudioViewModel Audio { get; } = new();
 
+        public AudioViewModel      Audio      { get; } = new();
         public PlayerListViewModel PlayerList { get; } = new();
-        public GameSessionViewModel Session { get; private set; } = null!;
-        
-        private float _masterVolume = 1f;
+        public GameSessionViewModel Session   { get; private set; } = null!;
+
+        // ── Master volume (délégué à AudioViewModel) ──────────────────────────
         public float MasterVolume
         {
-            get => _masterVolume;
-            set
-            {
-                _masterVolume = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(MasterVolumePercent));
-            }
+            get => Audio.MasterVolume;
+            set => Audio.MasterVolume = value;
         }
-        public int MasterVolumePercent => (int)(_masterVolume * 100);
+        public int MasterVolumePercent => Audio.MasterVolumePercent;
+
+        // ── Reconnecter ───────────────────────────────────────────────────────
+        private bool _isReconnecting;
+        public bool IsReconnecting
+        {
+            get => _isReconnecting;
+            set { _isReconnecting = value; OnPropertyChanged(); OnPropertyChanged(nameof(ReconnectText)); }
+        }
+        public string ReconnectText => _isReconnecting ? "Connexion..." : "↺ Reconnecter";
 
         public async void Reconnect()
         {
+            if (IsReconnecting) return;
+            IsReconnecting = true;
             await Session.ReconnectAsync();
+            IsReconnecting = false;
         }
 
         // ── Bindable properties ───────────────────────────────────────────────
@@ -39,7 +46,7 @@ namespace LoLProximityChat.WPF.ViewModels
             get => _isInGame;
             set { _isInGame = value; OnPropertyChanged(); }
         }
-        
+
         private bool _isServerConnected;
         public bool IsServerConnected
         {
@@ -59,8 +66,15 @@ namespace LoLProximityChat.WPF.ViewModels
         public MainViewModel()
         {
             Session = new GameSessionViewModel(_signalR, Audio);
+
             Session.OnServerConnectionChanged += connected =>
                 App.Current.Dispatcher.Invoke(() => IsServerConnected = connected);
+
+            Audio.MasterVolumeChanged += _ =>
+            {
+                OnPropertyChanged(nameof(MasterVolume));
+                OnPropertyChanged(nameof(MasterVolumePercent));
+            };
 
             _poller.OnGameStarted  += () => App.Current.Dispatcher.Invoke(OnGameStarted);
             _poller.OnGameEnded    += () => App.Current.Dispatcher.Invoke(OnGameEnded);

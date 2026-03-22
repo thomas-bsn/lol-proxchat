@@ -25,6 +25,14 @@ namespace LoLProximityChat.WPF.ViewModels
             _signalR = signalR;
             _audio   = audio;
             _audio.MuteMicRequested += muted => _voice.IsMuted = muted;
+            
+            _audio.MasterVolumeChanged += volume =>
+            {
+                foreach (var name in _voice.GetPlayerNames())
+                    _voice.SetMasterVolume(volume);
+            };
+
+            _audio.MicVolumeChanged += volume => _voice.SetMicVolume(volume);
 
             // Audio via SignalR
             _voice.OnAudioCaptured += async data =>

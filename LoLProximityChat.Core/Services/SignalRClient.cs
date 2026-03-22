@@ -7,15 +7,12 @@ namespace LoLProximityChat.Core.Services
         private HubConnection? _connection;
         private readonly string _serverUrl;
 
-        public event Action<string>?                     OnPlayerJoined;
-        public event Action<string>?                     OnPlayerLeft;
-        public event Action<Dictionary<string, float>>?  OnVolumesUpdated;
-        public event Action<string, byte[]>? OnAudioReceived;
-
-        public event Action<bool>? OnConnectionChanged;
-
-        public event Action<string, string, int>? OnPeerEndpoint; // playerName, ip, port
-
+        public event Action<string>?                    OnPlayerJoined;
+        public event Action<string>?                    OnPlayerLeft;
+        public event Action<Dictionary<string, float>>? OnVolumesUpdated;
+        public event Action<string, byte[]>?            OnAudioReceived;
+        public event Action<bool>?                      OnConnectionChanged;
+        public event Action<string, string, int>?       OnPeerEndpoint;
 
         public SignalRClient(string serverUrl)
         {
@@ -24,13 +21,20 @@ namespace LoLProximityChat.Core.Services
 
         public async Task ConnectAsync()
         {
+            // Dispose la connexion précédente si elle existe
+            if (_connection is not null)
+                await _connection.DisposeAsync();
+
             _connection = new HubConnectionBuilder()
                 .WithUrl($"{_serverUrl}/proximity")
-                .WithAutomaticReconnect()
+                .WithAutomaticReconnect(new[] { 0, 2000, 5000, 10000, 30000 }
+                    .Select(ms => TimeSpan.FromMilliseconds(ms)).ToArray())
                 .Build();
 
-            _connection.On<string>("PlayerJoined", name => OnPlayerJoined?.Invoke(name));
-            _connection.On<string>("PlayerLeft",   name => OnPlayerLeft?.Invoke(name));
+            _connection.On<string>("PlayerJoined",
+                name => OnPlayerJoined?.Invoke(name));
+            _connection.On<string>("PlayerLeft",
+                name => OnPlayerLeft?.Invoke(name));
             _connection.On<Dictionary<string, float>>("VolumesUpdated",
                 volumes => OnVolumesUpdated?.Invoke(volumes));
             _connection.On<string, string, int>("PeerEndpoint",
@@ -38,26 +42,37 @@ namespace LoLProximityChat.Core.Services
             _connection.On<string, byte[]>("ReceiveAudio",
                 (name, data) => OnAudioReceived?.Invoke(name, data));
 
-            try
-            {
-                await _connection.StartAsync();
-                OnConnectionChanged?.Invoke(true);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[SignalR] Connexion échouée : {ex.Message}");
-                OnConnectionChanged?.Invoke(false);
-            }
             _connection.Reconnected  += _ => { OnConnectionChanged?.Invoke(true);  return Task.CompletedTask; };
             _connection.Reconnecting += _ => { OnConnectionChanged?.Invoke(false); return Task.CompletedTask; };
+            _connection.Closed       += _ => { OnConnectionChanged?.Invoke(false); return Task.CompletedTask; };
+
+            // Retry 5 fois avec backoff
+            for (int i = 0; i < 5; i++)
+            {
+                try
+                {
+                    await _connection.StartAsync();
+                    OnConnectionChanged?.Invoke(true);
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[SignalR] Tentative {i + 1}/5 échouée : {ex.Message}");
+                    OnConnectionChanged?.Invoke(false);
+                    if (i < 4)
+                        await Task.Delay(2000 * (i + 1));
+                }
+            }
+
+            Console.WriteLine("[SignalR] Impossible de se connecter après 5 tentatives.");
         }
-        
+
         public async Task SendAudioAsync(string gameId, string playerName, byte[] data)
         {
             if (_connection is null || _connection.State != HubConnectionState.Connected) return;
             await _connection.InvokeAsync("SendAudio", gameId, playerName, data);
         }
-        
+
         public async Task RegisterEndpointAsync(string gameId, string playerName, string ip, int port)
         {
             if (_connection is null || _connection.State != HubConnectionState.Connected) return;
