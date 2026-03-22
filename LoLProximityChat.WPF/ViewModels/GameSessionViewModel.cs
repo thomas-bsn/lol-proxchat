@@ -99,9 +99,11 @@ namespace LoLProximityChat.WPF.ViewModels
             if (_currentGameId == "" && state.Players.Count >= 2 && state.LocalPlayerName != "")
             {
                 _localPlayerName = state.LocalPlayerName;
-                _currentGameId   = GenerateGameId(state.Players);
-                await _signalR.JoinGameAsync(_currentGameId, _localPlayerName);
+                _currentGameId   = GenerateGameId(state.Players, state.GameTime);
 
+                Console.WriteLine($"[GAMEID] {_currentGameId} (gameTime={state.GameTime:F0}s)");
+
+                await _signalR.JoinGameAsync(_currentGameId, _localPlayerName);
                 _voice.Start(_audio.SelectedInputIndex, _audio.SelectedOutputIndex);
             }
 
@@ -124,6 +126,17 @@ namespace LoLProximityChat.WPF.ViewModels
                         _currentGameId, _localPlayerName, stable.Value.x, stable.Value.y);
             }
         }
+        
+        private static string GenerateGameId(List<PlayerInfo> players, float gameTime)
+        {
+            // Arrondit à la minute inférieure → stable si les clients démarrent à ±59s d'écart
+            int minuteBucket = (int)(gameTime / 60f);
+
+            // Hash sur les noms triés + le bucket temps
+            var names = players.Select(p => p.SummonerName).OrderBy(n => n);
+            var key   = $"{string.Join("_", names)}_{minuteBucket}";
+            return key.GetHashCode().ToString("X");
+        }
 
         public async Task ReconnectAsync()
         {
@@ -143,12 +156,6 @@ namespace LoLProximityChat.WPF.ViewModels
             _localPlayerName = "";
             _isConnected     = false;
             _tracker.Reset();
-        }
-
-        private static string GenerateGameId(List<PlayerInfo> players)
-        {
-            var names = players.Select(p => p.SummonerName).OrderBy(n => n);
-            return string.Join("_", names).GetHashCode().ToString("X");
         }
 
         public async ValueTask DisposeAsync()

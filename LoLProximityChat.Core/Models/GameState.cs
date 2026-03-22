@@ -2,22 +2,28 @@
 
 namespace LoLProximityChat.Core.Models
 {
-    // Réponse de /liveclientdata/activeplayer
     public class ActivePlayer
     {
         [JsonPropertyName("summonerName")]
         public string SummonerName { get; set; } = "";
     }
 
-    // Ce qu'on expose aux couches supérieures après chaque poll
+    // NOUVEAU — mappe /liveclientdata/gamestats
+    public class GameStats
+    {
+        [JsonPropertyName("gameTime")]
+        public float GameTime { get; set; }
+    }
+
     public class GameState
     {
-        public bool IsInGame { get; set; }
-        public string LocalPlayerName { get; set; } = "";
+        public bool   IsInGame         { get; set; }
+        public string LocalPlayerName  { get; set; } = "";
         public List<PlayerInfo> Players { get; set; } = [];
+        public float  GameTime         { get; set; } // NOUVEAU
 
         public List<PlayerInfo> OrderTeam => Players.Where(p => p.Team == "ORDER").ToList();
         public List<PlayerInfo> ChaosTeam => Players.Where(p => p.Team == "CHAOS").ToList();
-        public PlayerInfo? LocalPlayer => Players.FirstOrDefault(p => p.IsLocalPlayer);
+        public PlayerInfo? LocalPlayer   => Players.FirstOrDefault(p => p.IsLocalPlayer);
     }
 }

@@ -5,28 +5,25 @@ namespace LoLProximityChat.Core.Services
 {
     public class LiveApiPoller : IDisposable
     {
-        private const string BaseUrl = "https://127.0.0.1:2999";
-        private const int PollIntervalMs = 1000;
+        private const string BaseUrl      = "https://127.0.0.1:2999";
+        private const int    PollIntervalMs = 1000;
 
-        // Riot utilise un certificat auto-signé — on ignore la validation SSL
         private static readonly HttpClient _http = new(new HttpClientHandler
         {
             ServerCertificateCustomValidationCallback = (_, _, _, _) => true
         })
         {
-            Timeout = TimeSpan.FromSeconds(2),
+            Timeout     = TimeSpan.FromSeconds(2),
             BaseAddress = new Uri(BaseUrl)
         };
 
         private CancellationTokenSource? _cts;
         private bool _wasInGame;
 
-        // ── Events ────────────────────────────────────────────────────────────
         public event Action<GameState>? OnStateChanged;
         public event Action?            OnGameStarted;
         public event Action?            OnGameEnded;
 
-        // ── Public API ────────────────────────────────────────────────────────
         public void Start()
         {
             _cts = new CancellationTokenSource();
@@ -35,7 +32,6 @@ namespace LoLProximityChat.Core.Services
 
         public void Stop() => _cts?.Cancel();
 
-        // ── Poll loop ─────────────────────────────────────────────────────────
         private async Task PollLoopAsync(CancellationToken ct)
         {
             while (!ct.IsCancellationRequested)
@@ -48,7 +44,6 @@ namespace LoLProximityChat.Core.Services
                 }
                 catch
                 {
-                    // API injoignable = pas en game
                     if (_wasInGame)
                     {
                         _wasInGame = false;
@@ -75,26 +70,28 @@ namespace LoLProximityChat.Core.Services
             }
         }
 
-        // ── Fetch ─────────────────────────────────────────────────────────────
         private static async Task<GameState> FetchStateAsync()
         {
-            // Joueur local
             var activeJson = await _http.GetStringAsync("/liveclientdata/activeplayer");
-            var active = JsonSerializer.Deserialize<ActivePlayer>(activeJson);
-            var localName = active?.SummonerName ?? "";
+            var active     = JsonSerializer.Deserialize<ActivePlayer>(activeJson);
+            var localName  = active?.SummonerName ?? "";
 
-            // Liste complète
             var listJson = await _http.GetStringAsync("/liveclientdata/playerlist");
-            var players = JsonSerializer.Deserialize<List<PlayerInfo>>(listJson) ?? [];
+            var players  = JsonSerializer.Deserialize<List<PlayerInfo>>(listJson) ?? [];
 
             foreach (var p in players)
                 p.IsLocalPlayer = p.SummonerName == localName;
+
+            // NOUVEAU — récupère le temps de jeu
+            var statsJson = await _http.GetStringAsync("/liveclientdata/gamestats");
+            var stats     = JsonSerializer.Deserialize<GameStats>(statsJson);
 
             return new GameState
             {
                 IsInGame        = true,
                 LocalPlayerName = localName,
-                Players         = players
+                Players         = players,
+                GameTime        = stats?.GameTime ?? 0f  // NOUVEAU
             };
         }
 
