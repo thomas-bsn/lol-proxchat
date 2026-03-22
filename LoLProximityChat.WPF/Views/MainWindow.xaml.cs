@@ -8,7 +8,22 @@ namespace LoLProximityChat.WPF.Views
         public MainWindow() => InitializeComponent();
 
         private void OnOpenCalibration(object sender, RoutedEventArgs e)
-            => new CalibrationOverlay().Show();
+        {
+            var overlay = new CalibrationOverlay();
+            
+            var lolProcess = System.Diagnostics.Process
+                .GetProcessesByName("League of Legends")
+                .FirstOrDefault();
+
+            if (lolProcess != null)
+            {
+                var screen = System.Windows.Forms.Screen.FromHandle(lolProcess.MainWindowHandle);
+                overlay.Left = screen.Bounds.Left;
+                overlay.Top  = screen.Bounds.Top;
+            }
+
+            overlay.Show();
+        }
 
         private void OnOpenAudio(object sender, RoutedEventArgs e)
             => new AudioWindow((DataContext as MainViewModel)!.Audio).Show();

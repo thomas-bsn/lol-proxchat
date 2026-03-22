@@ -7,6 +7,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <RootNamespace>LoLProximityChat.WPF</RootNamespace>
         <ApplicationIcon>Views\Assets\icon.ico</ApplicationIcon>
+        <UseWindowsForms>true</UseWindowsForms>
     </PropertyGroup>
 
     <ItemGroup>

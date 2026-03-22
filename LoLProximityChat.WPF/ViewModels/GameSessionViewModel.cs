@@ -2,6 +2,7 @@
 using LoLProximityChat.Core.Models;
 using LoLProximityChat.Core.Services;
 using System.Net;
+using System.Net.Http;
 using System.Net.Sockets;
 
 namespace LoLProximityChat.WPF.ViewModels
@@ -87,8 +88,8 @@ namespace LoLProximityChat.WPF.ViewModels
                 _currentGameId   = GenerateGameId(state.Players);
                 await _signalR.JoinGameAsync(_currentGameId, state.LocalPlayerName);
 
-                var localIp = GetLocalIp();
-                await _signalR.RegisterEndpointAsync(_currentGameId, _localPlayerName, localIp, 7777);
+                var publicIp = await GetPublicIpAsync();
+                await _signalR.RegisterEndpointAsync(_currentGameId, _localPlayerName, publicIp, 7777);
 
                 _voice.Start(_audio.SelectedInputIndex, _audio.SelectedOutputIndex);
                 _udp.Start();
@@ -111,6 +112,23 @@ namespace LoLProximityChat.WPF.ViewModels
                 if (stable.HasValue)
                     await _signalR.UpdatePositionAsync(
                         _currentGameId, _localPlayerName, stable.Value.x, stable.Value.y);
+            }
+        }
+        
+        private static async Task<string> GetPublicIpAsync()
+        {
+            try
+            {
+                using var http = new HttpClient();
+                var ip = await http.GetStringAsync("https://api.ipify.org");
+                return ip.Trim();
+            }
+            catch
+            {
+                // Fallback sur IP locale si pas d'internet
+                using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, 0);
+                socket.Connect("8.8.8.8", 65530);
+                return (socket.LocalEndPoint as IPEndPoint)?.Address.ToString() ?? "127.0.0.1";
             }
         }
 
@@ -138,13 +156,6 @@ namespace LoLProximityChat.WPF.ViewModels
         {
             var names = players.Select(p => p.SummonerName).OrderBy(n => n);
             return string.Join("_", names).GetHashCode().ToString("X");
-        }
-
-        private static string GetLocalIp()
-        {
-            using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, 0);
-            socket.Connect("8.8.8.8", 65530);
-            return (socket.LocalEndPoint as IPEndPoint)?.Address.ToString() ?? "127.0.0.1";
         }
 
         public async ValueTask DisposeAsync()

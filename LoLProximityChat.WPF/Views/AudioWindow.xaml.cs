@@ -25,13 +25,13 @@ namespace LoLProximityChat.WPF.Views
             var changed = vm.SaveServerUrl();
 
             if (changed)
-                MessageBox.Show(
+                System.Windows.MessageBox.Show(
                     "URL sauvegardée.\nRedémarre l'application pour te connecter au nouveau serveur.",
                     "Redémarrage requis",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
             else
-                MessageBox.Show(
+                System.Windows.MessageBox.Show(
                     "URL sauvegardée.",
                     "Sauvegardé",
                     MessageBoxButton.OK,
