@@ -13,6 +13,9 @@ namespace LoLProximityChat.WPF.Views
         private void OnOpenAudio(object sender, RoutedEventArgs e)
             => new AudioWindow((DataContext as MainViewModel)!.Audio).Show();
 
+        private void OnToggleMute(object sender, RoutedEventArgs e)
+            => (DataContext as MainViewModel)?.Audio.ToggleMicMute();
+
         protected override void OnClosed(EventArgs e)
         {
             if (DataContext is MainViewModel vm)

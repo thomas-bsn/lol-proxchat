@@ -111,6 +111,8 @@
             </Grid>
 
             <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+
+                <!-- Indicateur game -->
                 <Ellipse Width="10" Height="10" VerticalAlignment="Center" Margin="0,0,8,0">
                     <Ellipse.Style>
                         <Style TargetType="Ellipse">
@@ -124,6 +126,32 @@
                     </Ellipse.Style>
                 </Ellipse>
                 <TextBlock Text="{Binding StatusText}" FontSize="13" Foreground="#888888"/>
+
+                <!-- Séparateur -->
+                <TextBlock Text=" · " FontSize="13" Foreground="#555"/>
+
+                <!-- Indicateur serveur -->
+                <Ellipse Width="8" Height="8" VerticalAlignment="Center" Margin="0,0,4,0">
+                    <Ellipse.Style>
+                        <Style TargetType="Ellipse">
+                            <Setter Property="Fill" Value="#c62828"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsServerConnected}" Value="True">
+                                    <Setter Property="Fill" Value="#4caf50"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Ellipse.Style>
+                </Ellipse>
+                <TextBlock Text="{Binding ServerStatusText}" FontSize="11" Foreground="#888888"/>
+
+                <!-- Bouton mute micro -->
+                <Button Content="{Binding Audio.MicMuteIcon}"
+                        Background="Transparent" BorderThickness="0"
+                        Foreground="White" FontSize="14" Cursor="Hand"
+                        Margin="12,0,0,0"
+                        Visibility="{Binding IsInGame, Converter={StaticResource BoolToVis}}"
+                        Click="OnToggleMute"/>
             </StackPanel>
         </StackPanel>
 

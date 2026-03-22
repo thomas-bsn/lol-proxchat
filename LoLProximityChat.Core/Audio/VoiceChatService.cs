@@ -12,20 +12,24 @@ namespace LoLProximityChat.Core.Audio
         private const int SampleRate   = 48000;
         private const int Channels     = 1;
         private const int BitsPerSample = 16;
+        
+        private bool _isMuted = false;
 
         public event Action<byte[]>? OnAudioCaptured;
 
         // ── Démarrage ─────────────────────────────────────────────────────────
-        public void Start()
+        public void Start(int inputDeviceIndex = 0, int outputDeviceIndex = 0)
         {
             _microphone = new WaveInEvent
             {
-                WaveFormat  = new WaveFormat(SampleRate, BitsPerSample, Channels),
+                DeviceNumber       = inputDeviceIndex,
+                WaveFormat         = new WaveFormat(SampleRate, BitsPerSample, Channels),
                 BufferMilliseconds = 20
             };
 
             _microphone.DataAvailable += (_, e) =>
             {
+                if (_isMuted) return;
                 var data = new byte[e.BytesRecorded];
                 Buffer.BlockCopy(e.Buffer, 0, data, 0, e.BytesRecorded);
                 OnAudioCaptured?.Invoke(data);
@@ -34,18 +38,17 @@ namespace LoLProximityChat.Core.Audio
             _microphone.StartRecording();
         }
 
-        // ── Gestion des joueurs ───────────────────────────────────────────────
-        public void AddPlayer(string playerName)
+        public void AddPlayer(string playerName, int outputDeviceIndex = 0)
         {
             if (_playerBuffers.ContainsKey(playerName)) return;
 
             var buffer = new BufferedWaveProvider(new WaveFormat(SampleRate, BitsPerSample, Channels))
             {
-                BufferDuration       = TimeSpan.FromSeconds(1),
+                BufferDuration          = TimeSpan.FromSeconds(1),
                 DiscardOnBufferOverflow = true
             };
 
-            var output = new WaveOutEvent();
+            var output = new WaveOutEvent { DeviceNumber = outputDeviceIndex };
             output.Init(buffer);
             output.Play();
 
@@ -71,6 +74,20 @@ namespace LoLProximityChat.Core.Audio
         {
             if (!_playerBuffers.TryGetValue(playerName, out var buffer)) return;
             buffer.AddSamples(data, 0, data.Length);
+        }
+        
+        public bool IsMuted
+        {
+            get => _isMuted;
+            set
+            {
+                _isMuted = value;
+                if (_microphone != null)
+                {
+                    if (_isMuted) _microphone.StopRecording();
+                    else _microphone.StartRecording();
+                }
+            }
         }
 
         // ── Volumes (depuis SignalR) ───────────────────────────────────────────

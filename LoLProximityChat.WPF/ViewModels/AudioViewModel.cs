@@ -9,6 +9,7 @@ namespace LoLProximityChat.WPF.ViewModels
     public class PlayerAudioEntry : INotifyPropertyChanged
     {
         public string Name { get; set; } = "";
+        
 
         private float _volume = 1f;
         public float Volume
@@ -49,6 +50,8 @@ namespace LoLProximityChat.WPF.ViewModels
     public class AudioViewModel : INotifyPropertyChanged
     {
         public ObservableCollection<PlayerAudioEntry> Players { get; } = [];
+        public int SelectedInputIndex  => InputDevices.IndexOf(SelectedInput);
+        public int SelectedOutputIndex => OutputDevices.IndexOf(SelectedOutput);
 
         // ── Devices ───────────────────────────────────────────────────────────
         public ObservableCollection<string> InputDevices  { get; } = [];
@@ -77,6 +80,23 @@ namespace LoLProximityChat.WPF.ViewModels
         }
         public int MicVolumePercent => (int)(_micVolume * 100);
 
+        // ── Mute micro ────────────────────────────────────────────────────────
+        private bool _isMicMuted;
+        public bool IsMicMuted
+        {
+            get => _isMicMuted;
+            set { _isMicMuted = value; OnPropertyChanged(); OnPropertyChanged(nameof(MicMuteIcon)); }
+        }
+        public string MicMuteIcon => _isMicMuted ? "🔇" : "🎙";
+
+        public event Action<bool>? MuteMicRequested;
+
+        public void ToggleMicMute()
+        {
+            IsMicMuted = !IsMicMuted;
+            MuteMicRequested?.Invoke(IsMicMuted);
+        }
+
         // ── Serveur ───────────────────────────────────────────────────────────
         private string _serverUrl = AppConfig.Load().ServerUrl;
         public string ServerUrl
@@ -87,7 +107,7 @@ namespace LoLProximityChat.WPF.ViewModels
 
         public bool SaveServerUrl()
         {
-            var config = AppConfig.Load();
+            var config  = AppConfig.Load();
             var changed = config.ServerUrl != ServerUrl;
             config.ServerUrl = ServerUrl;
             config.Save();

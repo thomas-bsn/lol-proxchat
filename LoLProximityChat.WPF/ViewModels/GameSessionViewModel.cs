@@ -15,6 +15,7 @@ namespace LoLProximityChat.WPF.ViewModels
         private readonly VoiceChatService _voice = new();
         private readonly UdpAudioTransport _udp;
         private readonly AudioViewModel _audio;
+        public event Action<bool>? OnServerConnectionChanged;
 
         private readonly Dictionary<string, IPEndPoint> _peerEndpoints = new();
 
@@ -26,6 +27,7 @@ namespace LoLProximityChat.WPF.ViewModels
         {
             _signalR = signalR;
             _audio   = audio;
+            _audio.MuteMicRequested += muted => _voice.IsMuted = muted;
             _udp     = new UdpAudioTransport(listenPort: 7777);
 
             _voice.OnAudioCaptured += async data =>
@@ -64,6 +66,10 @@ namespace LoLProximityChat.WPF.ViewModels
                 if (playerName != _localPlayerName)
                     RegisterPeer(playerName, ip, port);
             };
+            
+            _signalR.OnConnectionChanged += connected => 
+                OnServerConnectionChanged?.Invoke(connected);
+
         }
 
         public async Task OnStateAsync(GameState state)
@@ -84,7 +90,7 @@ namespace LoLProximityChat.WPF.ViewModels
                 var localIp = GetLocalIp();
                 await _signalR.RegisterEndpointAsync(_currentGameId, _localPlayerName, localIp, 7777);
 
-                _voice.Start();
+                _voice.Start(_audio.SelectedInputIndex, _audio.SelectedOutputIndex);
                 _udp.Start();
             }
 
@@ -111,7 +117,7 @@ namespace LoLProximityChat.WPF.ViewModels
         public void RegisterPeer(string playerName, string ip, int port)
         {
             _peerEndpoints[playerName] = new IPEndPoint(IPAddress.Parse(ip), port);
-            _voice.AddPlayer(playerName);
+            _voice.AddPlayer(playerName, _audio.SelectedOutputIndex);
         }
 
         public async Task OnGameEndedAsync()

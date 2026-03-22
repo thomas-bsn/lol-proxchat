@@ -10,6 +10,8 @@ namespace LoLProximityChat.Core.Services
         public event Action<string>?                     OnPlayerJoined;
         public event Action<string>?                     OnPlayerLeft;
         public event Action<Dictionary<string, float>>?  OnVolumesUpdated;
+        public event Action<bool>? OnConnectionChanged;
+
         public event Action<string, string, int>? OnPeerEndpoint; // playerName, ip, port
 
 
@@ -35,11 +37,15 @@ namespace LoLProximityChat.Core.Services
             try
             {
                 await _connection.StartAsync();
+                OnConnectionChanged?.Invoke(true);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[SignalR] Connexion échouée : {ex.Message}");
+                OnConnectionChanged?.Invoke(false);
             }
+            _connection.Reconnected  += _ => { OnConnectionChanged?.Invoke(true);  return Task.CompletedTask; };
+            _connection.Reconnecting += _ => { OnConnectionChanged?.Invoke(false); return Task.CompletedTask; };
         }
         
         public async Task RegisterEndpointAsync(string gameId, string playerName, string ip, int port)
