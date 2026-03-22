@@ -9,7 +9,8 @@ namespace LoLProximityChat.WPF.Views
 
         protected override void OnClosed(EventArgs e)
         {
-            (DataContext as MainViewModel)?.Dispose();
+            if (DataContext is MainViewModel vm)
+                vm.DisposeAsync().AsTask().Wait();
             base.OnClosed(e);
         }
         private void OnOpenCalibration(object sender, RoutedEventArgs e)

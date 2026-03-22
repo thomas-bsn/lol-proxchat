@@ -12,11 +12,6 @@ namespace LoLProximityChat.WPF.Views
 
         private void OnReset(object sender, RoutedEventArgs e)
             => (DataContext as CalibrationViewModel)?.Reset();
-
-        protected override void OnClosed(EventArgs e)
-        {
-            (DataContext as CalibrationViewModel)?.Dispose();
-            base.OnClosed(e);
-        }
+        
     }
 }
