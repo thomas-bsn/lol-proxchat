@@ -29,6 +29,12 @@ namespace LoLProximityChat.Server.Hubs
             foreach (var (_, (connId, volumes)) in volumeMap)
                 await Clients.Client(connId).SendAsync("VolumesUpdated", volumes);
         }
+        
+        public async Task RegisterEndpoint(string gameId, string playerName, string ip, int port)
+        {
+            await Clients.Group(gameId).SendAsync("PeerEndpoint", playerName, ip, port);
+            Console.WriteLine($"[ENDPOINT] {playerName} → {ip}:{port}");
+        }
 
         public async Task LeaveGame(string gameId, string playerName)
         {

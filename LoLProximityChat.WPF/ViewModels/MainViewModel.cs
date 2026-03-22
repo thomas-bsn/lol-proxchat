@@ -9,6 +9,7 @@ namespace LoLProximityChat.WPF.ViewModels
     {
         private readonly LiveApiPoller _poller = new();
         private readonly SignalRClient _signalR = new("http://localhost:5128");
+        public AudioViewModel Audio { get; } = new();
 
         public PlayerListViewModel PlayerList { get; } = new();
         public GameSessionViewModel Session { get; private set; } = null!;
@@ -31,7 +32,7 @@ namespace LoLProximityChat.WPF.ViewModels
         // ── Init ──────────────────────────────────────────────────────────────
         public MainViewModel()
         {
-            Session = new GameSessionViewModel(_signalR);
+            Session = new GameSessionViewModel(_signalR, Audio);
 
             _poller.OnGameStarted  += () => App.Current.Dispatcher.Invoke(OnGameStarted);
             _poller.OnGameEnded    += () => App.Current.Dispatcher.Invoke(OnGameEnded);

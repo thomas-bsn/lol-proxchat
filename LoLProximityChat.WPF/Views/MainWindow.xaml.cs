@@ -7,13 +7,17 @@ namespace LoLProximityChat.WPF.Views
     {
         public MainWindow() => InitializeComponent();
 
+        private void OnOpenCalibration(object sender, RoutedEventArgs e)
+            => new CalibrationOverlay().Show();
+
+        private void OnOpenAudio(object sender, RoutedEventArgs e)
+            => new AudioWindow((DataContext as MainViewModel)!.Audio).Show();
+
         protected override void OnClosed(EventArgs e)
         {
             if (DataContext is MainViewModel vm)
                 vm.DisposeAsync().AsTask().Wait();
             base.OnClosed(e);
         }
-        private void OnOpenCalibration(object sender, RoutedEventArgs e)
-            => new CalibrationOverlay().Show();
     }
 }

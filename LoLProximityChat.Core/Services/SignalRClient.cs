@@ -10,6 +10,8 @@ namespace LoLProximityChat.Core.Services
         public event Action<string>?                     OnPlayerJoined;
         public event Action<string>?                     OnPlayerLeft;
         public event Action<Dictionary<string, float>>?  OnVolumesUpdated;
+        public event Action<string, string, int>? OnPeerEndpoint; // playerName, ip, port
+
 
         public SignalRClient(string serverUrl)
         {
@@ -27,6 +29,8 @@ namespace LoLProximityChat.Core.Services
             _connection.On<string>("PlayerLeft",   name => OnPlayerLeft?.Invoke(name));
             _connection.On<Dictionary<string, float>>("VolumesUpdated",
                 volumes => OnVolumesUpdated?.Invoke(volumes));
+            _connection.On<string, string, int>("PeerEndpoint",
+                (name, ip, port) => OnPeerEndpoint?.Invoke(name, ip, port));
 
             try
             {
@@ -36,6 +40,12 @@ namespace LoLProximityChat.Core.Services
             {
                 Console.WriteLine($"[SignalR] Connexion échouée : {ex.Message}");
             }
+        }
+        
+        public async Task RegisterEndpointAsync(string gameId, string playerName, string ip, int port)
+        {
+            if (_connection is null || _connection.State != HubConnectionState.Connected) return;
+            await _connection.InvokeAsync("RegisterEndpoint", gameId, playerName, ip, port);
         }
 
         public async Task JoinGameAsync(string gameId, string playerName)

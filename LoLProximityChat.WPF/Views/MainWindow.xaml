@@ -93,14 +93,23 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
+
                 <TextBlock Text="LoL Proximity Chat" FontSize="20" FontWeight="Bold"
                            Foreground="#c89b3c"/>
-                <Button Grid.Column="1" Content="⚙ Calibration"
+
+                <Button Grid.Column="1" Content="🎙 Audio"
+                        Background="Transparent" Foreground="#888"
+                        BorderThickness="0" FontFamily="Segoe UI" FontSize="12"
+                        Cursor="Hand" Click="OnOpenAudio" Margin="0,0,8,0"/>
+
+                <Button Grid.Column="2" Content="⚙ Calibration"
                         Background="Transparent" Foreground="#888"
                         BorderThickness="0" FontFamily="Segoe UI" FontSize="12"
                         Cursor="Hand" Click="OnOpenCalibration"/>
             </Grid>
+
             <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
                 <Ellipse Width="10" Height="10" VerticalAlignment="Center" Margin="0,0,8,0">
                     <Ellipse.Style>
@@ -129,13 +138,13 @@
         <!-- Listes joueurs -->
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
             <StackPanel>
-                <TextBlock Text="Équipe Bleue (ORDER)" FontSize="13" FontWeight="SemiBold"
+                <TextBlock Text="Team Blue" FontSize="13" FontWeight="SemiBold"
                            Foreground="#1976d2" Margin="0,0,0,4"
                            Visibility="{Binding IsInGame, Converter={StaticResource BoolToVis}}"/>
                 <ItemsControl ItemsSource="{Binding PlayerList.OrderTeam}"
                               ItemTemplate="{StaticResource PlayerTemplate}"/>
 
-                <TextBlock Text="Équipe Rouge (CHAOS)" FontSize="13" FontWeight="SemiBold"
+                <TextBlock Text="Team Red" FontSize="13" FontWeight="SemiBold"
                            Foreground="#c62828" Margin="0,12,0,4"
                            Visibility="{Binding IsInGame, Converter={StaticResource BoolToVis}}"/>
                 <ItemsControl ItemsSource="{Binding PlayerList.ChaosTeam}"
