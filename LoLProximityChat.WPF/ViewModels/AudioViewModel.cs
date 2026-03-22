@@ -1,6 +1,7 @@
 ﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using LoLProximityChat.Core.Models;
 using NAudio.Wave;
 
 namespace LoLProximityChat.WPF.ViewModels
@@ -53,7 +54,7 @@ namespace LoLProximityChat.WPF.ViewModels
         public ObservableCollection<string> InputDevices  { get; } = [];
         public ObservableCollection<string> OutputDevices { get; } = [];
 
-        private string _selectedInput  = "";
+        private string _selectedInput = "";
         public string SelectedInput
         {
             get => _selectedInput;
@@ -76,6 +77,21 @@ namespace LoLProximityChat.WPF.ViewModels
         }
         public int MicVolumePercent => (int)(_micVolume * 100);
 
+        // ── Serveur ───────────────────────────────────────────────────────────
+        private string _serverUrl = AppConfig.Load().ServerUrl;
+        public string ServerUrl
+        {
+            get => _serverUrl;
+            set { _serverUrl = value; OnPropertyChanged(); }
+        }
+
+        public void SaveServerUrl()
+        {
+            var config    = AppConfig.Load();
+            config.ServerUrl = ServerUrl;
+            config.Save();
+        }
+
         // ── Init ──────────────────────────────────────────────────────────────
         public AudioViewModel()
         {
@@ -96,7 +112,7 @@ namespace LoLProximityChat.WPF.ViewModels
             if (OutputDevices.Count > 0) SelectedOutput = OutputDevices[0];
         }
 
-        // ── Appelé par GameSessionViewModel quand les volumes changent ────────
+        // ── Appelé par GameSessionViewModel ───────────────────────────────────
         public void UpdateVolumes(Dictionary<string, float> volumes)
         {
             foreach (var (name, volume) in volumes)

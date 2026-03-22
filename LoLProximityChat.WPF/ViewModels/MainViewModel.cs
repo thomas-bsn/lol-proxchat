@@ -8,7 +8,7 @@ namespace LoLProximityChat.WPF.ViewModels
     public class MainViewModel : INotifyPropertyChanged, IAsyncDisposable
     {
         private readonly LiveApiPoller _poller = new();
-        private readonly SignalRClient _signalR = new("http://localhost:5128");
+        private readonly SignalRClient _signalR = new(AppConfig.Load().ServerUrl);
         public AudioViewModel Audio { get; } = new();
 
         public PlayerListViewModel PlayerList { get; } = new();

@@ -16,5 +16,8 @@ namespace LoLProximityChat.WPF.Views
             if (sender is FrameworkElement { DataContext: PlayerAudioEntry entry })
                 entry.IsMuted = !entry.IsMuted;
         }
+
+        private void OnSaveServerUrl(object sender, RoutedEventArgs e)
+            => (DataContext as AudioViewModel)?.SaveServerUrl();
     }
 }

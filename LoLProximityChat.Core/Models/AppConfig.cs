@@ -1,5 +1,4 @@
-﻿// Models/AppConfig.cs
-using System.Text.Json;
+﻿using System.Text.Json;
 
 namespace LoLProximityChat.Core.Models
 {
@@ -8,6 +7,7 @@ namespace LoLProximityChat.Core.Models
         public int MinimapX      { get; set; }
         public int MinimapY      { get; set; }
         public int MinimapSize   { get; set; }
+        public string ServerUrl { get; set; } = "http://localhost:5128";
 
         private static readonly string ConfigPath =
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
