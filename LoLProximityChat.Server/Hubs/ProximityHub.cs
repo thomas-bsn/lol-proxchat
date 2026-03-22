@@ -30,6 +30,11 @@ namespace LoLProximityChat.Server.Hubs
                 await Clients.Client(connId).SendAsync("VolumesUpdated", volumes);
         }
         
+        public async Task SendAudio(string gameId, string playerName, byte[] audioData)
+        {
+            await Clients.OthersInGroup(gameId).SendAsync("ReceiveAudio", playerName, audioData);
+        }
+        
         public async Task RegisterEndpoint(string gameId, string playerName, string ip, int port)
         {
             await Clients.Group(gameId).SendAsync("PeerEndpoint", playerName, ip, port);

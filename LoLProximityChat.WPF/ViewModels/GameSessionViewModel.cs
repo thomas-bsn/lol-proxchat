@@ -1,9 +1,7 @@
 ﻿using LoLProximityChat.Core.Audio;
 using LoLProximityChat.Core.Models;
 using LoLProximityChat.Core.Services;
-using System.Net;
 using System.Net.Http;
-using System.Net.Sockets;
 
 namespace LoLProximityChat.WPF.ViewModels
 {
@@ -14,11 +12,9 @@ namespace LoLProximityChat.WPF.ViewModels
         private readonly AppConfig _config = AppConfig.Load();
         private readonly PositionTracker _tracker = new();
         private readonly VoiceChatService _voice = new();
-        private readonly UdpAudioTransport _udp;
         private readonly AudioViewModel _audio;
-        public event Action<bool>? OnServerConnectionChanged;
 
-        private readonly Dictionary<string, IPEndPoint> _peerEndpoints = new();
+        public event Action<bool>? OnServerConnectionChanged;
 
         private string _currentGameId   = "";
         private string _localPlayerName = "";
@@ -29,15 +25,15 @@ namespace LoLProximityChat.WPF.ViewModels
             _signalR = signalR;
             _audio   = audio;
             _audio.MuteMicRequested += muted => _voice.IsMuted = muted;
-            _udp     = new UdpAudioTransport(listenPort: 7777);
 
+            // Audio via SignalR
             _voice.OnAudioCaptured += async data =>
             {
-                foreach (var (_, endpoint) in _peerEndpoints)
-                    await _udp.SendAsync(data, _localPlayerName, endpoint);
+                if (_currentGameId != "")
+                    await _signalR.SendAudioAsync(_currentGameId, _localPlayerName, data);
             };
 
-            _udp.OnAudioReceived += (playerName, data) =>
+            _signalR.OnAudioReceived += (playerName, data) =>
                 _voice.ReceiveAudio(playerName, data);
 
             _signalR.OnVolumesUpdated += volumes =>
@@ -50,7 +46,7 @@ namespace LoLProximityChat.WPF.ViewModels
             {
                 if (playerName != _localPlayerName)
                 {
-                    _voice.AddPlayer(playerName);
+                    _voice.AddPlayer(playerName, _audio.SelectedOutputIndex);
                     _audio.AddPlayer(playerName);
                 }
             };
@@ -59,18 +55,10 @@ namespace LoLProximityChat.WPF.ViewModels
             {
                 _voice.RemovePlayer(playerName);
                 _audio.RemovePlayer(playerName);
-                _peerEndpoints.Remove(playerName);
             };
 
-            _signalR.OnPeerEndpoint += (playerName, ip, port) =>
-            {
-                if (playerName != _localPlayerName)
-                    RegisterPeer(playerName, ip, port);
-            };
-            
-            _signalR.OnConnectionChanged += connected => 
+            _signalR.OnConnectionChanged += connected =>
                 OnServerConnectionChanged?.Invoke(connected);
-
         }
 
         public async Task OnStateAsync(GameState state)
@@ -88,11 +76,7 @@ namespace LoLProximityChat.WPF.ViewModels
                 _currentGameId   = GenerateGameId(state.Players);
                 await _signalR.JoinGameAsync(_currentGameId, state.LocalPlayerName);
 
-                var publicIp = await GetPublicIpAsync();
-                await _signalR.RegisterEndpointAsync(_currentGameId, _localPlayerName, publicIp, 7777);
-
                 _voice.Start(_audio.SelectedInputIndex, _audio.SelectedOutputIndex);
-                _udp.Start();
             }
 
             var capture  = new MinimapCapture(new MinimapRegion
@@ -102,7 +86,7 @@ namespace LoLProximityChat.WPF.ViewModels
                 Width  = _config.MinimapSize,
                 Height = _config.MinimapSize
             });
-            var blobs    = capture.DetectBlobs();
+            var blobs     = capture.DetectBlobs();
             var positions = _proximity.MapBlobsToPlayers(blobs, state.Players);
 
             var localPos = positions.FirstOrDefault(p => p.SummonerName == _localPlayerName);
@@ -114,42 +98,25 @@ namespace LoLProximityChat.WPF.ViewModels
                         _currentGameId, _localPlayerName, stable.Value.x, stable.Value.y);
             }
         }
-        
-        private static async Task<string> GetPublicIpAsync()
-        {
-            try
-            {
-                using var http = new HttpClient();
-                var ip = await http.GetStringAsync("https://api.ipify.org");
-                return ip.Trim();
-            }
-            catch
-            {
-                // Fallback sur IP locale si pas d'internet
-                using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, 0);
-                socket.Connect("8.8.8.8", 65530);
-                return (socket.LocalEndPoint as IPEndPoint)?.Address.ToString() ?? "127.0.0.1";
-            }
-        }
 
-        public void RegisterPeer(string playerName, string ip, int port)
+        public async Task ReconnectAsync()
         {
-            _peerEndpoints[playerName] = new IPEndPoint(IPAddress.Parse(ip), port);
-            _voice.AddPlayer(playerName, _audio.SelectedOutputIndex);
+            _isConnected     = false;
+            _currentGameId   = "";
+            _localPlayerName = "";
+            _tracker.Reset();
+            await _signalR.ConnectAsync();
         }
 
         public async Task OnGameEndedAsync()
         {
             _voice.Dispose();
-            _udp.Dispose();
-
             await _signalR.LeaveGameAsync(_currentGameId, _localPlayerName);
 
             _currentGameId   = "";
             _localPlayerName = "";
             _isConnected     = false;
             _tracker.Reset();
-            _peerEndpoints.Clear();
         }
 
         private static string GenerateGameId(List<PlayerInfo> players)
@@ -161,7 +128,6 @@ namespace LoLProximityChat.WPF.ViewModels
         public async ValueTask DisposeAsync()
         {
             _voice.Dispose();
-            _udp.Dispose();
             await _signalR.DisposeAsync();
         }
     }

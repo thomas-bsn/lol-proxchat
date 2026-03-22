@@ -10,6 +10,8 @@ namespace LoLProximityChat.Core.Services
         public event Action<string>?                     OnPlayerJoined;
         public event Action<string>?                     OnPlayerLeft;
         public event Action<Dictionary<string, float>>?  OnVolumesUpdated;
+        public event Action<string, byte[]>? OnAudioReceived;
+
         public event Action<bool>? OnConnectionChanged;
 
         public event Action<string, string, int>? OnPeerEndpoint; // playerName, ip, port
@@ -33,6 +35,8 @@ namespace LoLProximityChat.Core.Services
                 volumes => OnVolumesUpdated?.Invoke(volumes));
             _connection.On<string, string, int>("PeerEndpoint",
                 (name, ip, port) => OnPeerEndpoint?.Invoke(name, ip, port));
+            _connection.On<string, byte[]>("ReceiveAudio",
+                (name, data) => OnAudioReceived?.Invoke(name, data));
 
             try
             {
@@ -46,6 +50,12 @@ namespace LoLProximityChat.Core.Services
             }
             _connection.Reconnected  += _ => { OnConnectionChanged?.Invoke(true);  return Task.CompletedTask; };
             _connection.Reconnecting += _ => { OnConnectionChanged?.Invoke(false); return Task.CompletedTask; };
+        }
+        
+        public async Task SendAudioAsync(string gameId, string playerName, byte[] data)
+        {
+            if (_connection is null || _connection.State != HubConnectionState.Connected) return;
+            await _connection.InvokeAsync("SendAudio", gameId, playerName, data);
         }
         
         public async Task RegisterEndpointAsync(string gameId, string playerName, string ip, int port)

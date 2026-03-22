@@ -10,18 +10,15 @@ namespace LoLProximityChat.WPF.Views
         private void OnOpenCalibration(object sender, RoutedEventArgs e)
         {
             var overlay = new CalibrationOverlay();
-            
             var lolProcess = System.Diagnostics.Process
                 .GetProcessesByName("League of Legends")
                 .FirstOrDefault();
-
             if (lolProcess != null)
             {
                 var screen = System.Windows.Forms.Screen.FromHandle(lolProcess.MainWindowHandle);
                 overlay.Left = screen.Bounds.Left;
                 overlay.Top  = screen.Bounds.Top;
             }
-
             overlay.Show();
         }
 
@@ -30,6 +27,9 @@ namespace LoLProximityChat.WPF.Views
 
         private void OnToggleMute(object sender, RoutedEventArgs e)
             => (DataContext as MainViewModel)?.Audio.ToggleMicMute();
+
+        private void OnReconnect(object sender, RoutedEventArgs e)
+            => (DataContext as MainViewModel)?.Reconnect();
 
         protected override void OnClosed(EventArgs e)
         {

@@ -13,6 +13,24 @@ namespace LoLProximityChat.WPF.ViewModels
 
         public PlayerListViewModel PlayerList { get; } = new();
         public GameSessionViewModel Session { get; private set; } = null!;
+        
+        private float _masterVolume = 1f;
+        public float MasterVolume
+        {
+            get => _masterVolume;
+            set
+            {
+                _masterVolume = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(MasterVolumePercent));
+            }
+        }
+        public int MasterVolumePercent => (int)(_masterVolume * 100);
+
+        public async void Reconnect()
+        {
+            await Session.ReconnectAsync();
+        }
 
         // ── Bindable properties ───────────────────────────────────────────────
         private bool _isInGame;
