@@ -1,0 +1,89 @@
+﻿<Window x:Class="LoLProximityChat.WPF.Views.CalibrationWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:LoLProximityChat.WPF.ViewModels"
+        Title="Calibration Minimap" Height="520" Width="400"
+        Topmost="True"
+        Background="#1a1a2e" ResizeMode="CanMinimize">
+
+    <Window.DataContext>
+        <vm:CalibrationViewModel/>
+    </Window.DataContext>
+
+    <Window.Resources>
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#e0e0e0"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+        </Style>
+        <Style TargetType="Slider">
+            <Setter Property="Margin" Value="0,4,0,12"/>
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="#0f3460"/>
+            <Setter Property="Foreground" Value="#e0e0e0"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="200"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Titre -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,12">
+            <TextBlock Text="Calibration Minimap" FontSize="18"
+                       FontWeight="Bold" Foreground="#c89b3c"/>
+            <TextBlock Text="Ajuste la zone de capture pour qu'elle corresponde à ta minimap."
+                       FontSize="12" Foreground="#888" Margin="0,4,0,0" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <!-- Aperçu -->
+        <Border Grid.Row="1" Background="#0a0a1a" CornerRadius="8"
+                Margin="0,0,0,12">
+            <Image Source="{Binding Preview}" Stretch="Uniform"
+                   RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+        </Border>
+
+        <!-- Sliders -->
+        <StackPanel Grid.Row="2" Margin="0,0,0,8">
+            <TextBlock Text="{Binding PositionLabel}" FontSize="12"
+                       Foreground="#c89b3c" Margin="0,0,0,8"/>
+
+            <TextBlock Text="Position X"/>
+            <Slider Minimum="0" Maximum="3840" Value="{Binding MinimapX}"
+                    TickFrequency="10" IsSnapToTickEnabled="True"/>
+
+            <TextBlock Text="Position Y"/>
+            <Slider Minimum="0" Maximum="2160" Value="{Binding MinimapY}"
+                    TickFrequency="10" IsSnapToTickEnabled="True"/>
+
+            <TextBlock Text="Taille"/>
+            <Slider Minimum="100" Maximum="400" Value="{Binding MinimapSize}"
+                    TickFrequency="5" IsSnapToTickEnabled="True"/>
+        </StackPanel>
+
+        <!-- Boutons + status -->
+        <Grid Grid.Row="3">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0" Text="{Binding StatusText}"
+                       Foreground="#4caf50" VerticalAlignment="Center"/>
+            <Button Grid.Column="1" Content="Reset" Margin="0,0,8,0"
+                    Click="OnReset"/>
+            <Button Grid.Column="2" Content="Sauvegarder" Background="#c89b3c"
+                    Foreground="#1a1a2e" FontWeight="SemiBold"
+                    Click="OnSave"/>
+        </Grid>
+    </Grid>
+</Window>

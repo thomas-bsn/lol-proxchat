@@ -1,0 +1,9 @@
+bin/
+obj/
+*.user
+.vs/
+.idea/
+.debug/
+appsettings.Development.json
+minimap_debug.png
+mask_*.png
