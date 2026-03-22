@@ -5,6 +5,7 @@
         private readonly Dictionary<string, Dictionary<string, (float x, float y)>> _rooms = new();
         private readonly Dictionary<string, string> _connectionToPlayer = new();
         private readonly Dictionary<string, string> _playerToConnection = new();
+        private readonly Dictionary<string, string> _connectionToGame = new(); // NOUVEAU
         private readonly object _lock = new();
 
         public void AddPlayer(string connectionId, string playerName, string gameId)
@@ -15,6 +16,7 @@
                     _rooms[gameId] = new();
                 _connectionToPlayer[connectionId] = playerName;
                 _playerToConnection[playerName]   = connectionId;
+                _connectionToGame[connectionId]   = gameId; // NOUVEAU
             }
         }
 
@@ -25,6 +27,7 @@
                 if (!_connectionToPlayer.TryGetValue(connectionId, out var playerName)) return;
                 _connectionToPlayer.Remove(connectionId);
                 _playerToConnection.Remove(playerName);
+                _connectionToGame.Remove(connectionId); // NOUVEAU
 
                 foreach (var room in _rooms.Values)
                     room.Remove(playerName);
@@ -43,6 +46,26 @@
             }
         }
 
+        // NOUVEAU
+        public List<string> GetPlayerNames(string gameId)
+        {
+            lock (_lock)
+            {
+                if (!_rooms.TryGetValue(gameId, out var room)) return new();
+                return room.Keys.ToList();
+            }
+        }
+
+        // NOUVEAU
+        public string? GetGameId(string connectionId)
+        {
+            lock (_lock)
+            {
+                _connectionToGame.TryGetValue(connectionId, out var gameId);
+                return gameId;
+            }
+        }
+
         public void UpdatePosition(string gameId, string playerName, float x, float y)
         {
             lock (_lock)
@@ -53,7 +76,6 @@
             }
         }
 
-        // Retourne les volumes pour chaque listener de la room
         public Dictionary<string, (string connectionId, Dictionary<string, float> volumes)> ComputeVolumes(string gameId)
         {
             Dictionary<string, (float x, float y)> positions;

@@ -13,6 +13,7 @@ namespace LoLProximityChat.Core.Services
         public event Action<string, byte[]>?            OnAudioReceived;
         public event Action<bool>?                      OnConnectionChanged;
         public event Action<string, string, int>?       OnPeerEndpoint;
+        public event Action<List<string>>?              OnExistingPlayers; // NOUVEAU
 
         public SignalRClient(string serverUrl)
         {
@@ -21,7 +22,6 @@ namespace LoLProximityChat.Core.Services
 
         public async Task ConnectAsync()
         {
-            // Dispose la connexion précédente si elle existe
             if (_connection is not null)
                 await _connection.DisposeAsync();
 
@@ -41,12 +41,13 @@ namespace LoLProximityChat.Core.Services
                 (name, ip, port) => OnPeerEndpoint?.Invoke(name, ip, port));
             _connection.On<string, byte[]>("ReceiveAudio",
                 (name, data) => OnAudioReceived?.Invoke(name, data));
+            _connection.On<List<string>>("ExistingPlayers",          // NOUVEAU
+                names => OnExistingPlayers?.Invoke(names));
 
             _connection.Reconnected  += _ => { OnConnectionChanged?.Invoke(true);  return Task.CompletedTask; };
             _connection.Reconnecting += _ => { OnConnectionChanged?.Invoke(false); return Task.CompletedTask; };
             _connection.Closed       += _ => { OnConnectionChanged?.Invoke(false); return Task.CompletedTask; };
 
-            // Retry 5 fois avec backoff
             for (int i = 0; i < 5; i++)
             {
                 try

@@ -1,18 +1,17 @@
 ﻿using LoLProximityChat.Core.Audio;
 using LoLProximityChat.Core.Models;
 using LoLProximityChat.Core.Services;
-using System.Net.Http;
 
 namespace LoLProximityChat.WPF.ViewModels
 {
     public class GameSessionViewModel : IAsyncDisposable
     {
-        private readonly SignalRClient _signalR;
+        private readonly SignalRClient    _signalR;
         private readonly ProximityCalculator _proximity = new();
-        private readonly AppConfig _config = AppConfig.Load();
-        private readonly PositionTracker _tracker = new();
-        private readonly VoiceChatService _voice = new();
-        private readonly AudioViewModel _audio;
+        private readonly AppConfig        _config   = AppConfig.Load();
+        private readonly PositionTracker  _tracker  = new();
+        private readonly VoiceChatService _voice    = new();
+        private readonly AudioViewModel   _audio;
 
         public event Action<bool>? OnServerConnectionChanged;
 
@@ -24,17 +23,11 @@ namespace LoLProximityChat.WPF.ViewModels
         {
             _signalR = signalR;
             _audio   = audio;
-            _audio.MuteMicRequested += muted => _voice.IsMuted = muted;
-            
-            _audio.MasterVolumeChanged += volume =>
-            {
-                foreach (var name in _voice.GetPlayerNames())
-                    _voice.SetMasterVolume(volume);
-            };
 
-            _audio.MicVolumeChanged += volume => _voice.SetMicVolume(volume);
+            _audio.MuteMicRequested    += muted  => _voice.IsMuted = muted;
+            _audio.MasterVolumeChanged += volume => _voice.SetMasterVolume(volume);
+            _audio.MicVolumeChanged    += volume => _voice.SetMicVolume(volume);
 
-            // Audio via SignalR
             _voice.OnAudioCaptured += async data =>
             {
                 if (_currentGameId != "")
@@ -52,10 +45,19 @@ namespace LoLProximityChat.WPF.ViewModels
 
             _signalR.OnPlayerJoined += playerName =>
             {
-                if (playerName != _localPlayerName)
+                if (playerName == _localPlayerName) return;
+                _voice.AddPlayer(playerName, _audio.SelectedOutputIndex);
+                _audio.AddPlayer(playerName);
+            };
+
+            // NOUVEAU — joueurs déjà présents quand on rejoint
+            _signalR.OnExistingPlayers += players =>
+            {
+                foreach (var name in players)
                 {
-                    _voice.AddPlayer(playerName, _audio.SelectedOutputIndex);
-                    _audio.AddPlayer(playerName);
+                    if (name == _localPlayerName) continue;
+                    _voice.AddPlayer(name, _audio.SelectedOutputIndex);
+                    _audio.AddPlayer(name);
                 }
             };
 
@@ -78,16 +80,17 @@ namespace LoLProximityChat.WPF.ViewModels
                 await Task.Delay(500);
             }
 
-            if (_currentGameId == "" && state.LocalPlayerName != "")
+            // FIX : >= 2 au lieu de == "" seulement, pour ne pas hasher une liste incomplète
+            if (_currentGameId == "" && state.Players.Count >= 2 && state.LocalPlayerName != "")
             {
                 _localPlayerName = state.LocalPlayerName;
                 _currentGameId   = GenerateGameId(state.Players);
-                await _signalR.JoinGameAsync(_currentGameId, state.LocalPlayerName);
+                await _signalR.JoinGameAsync(_currentGameId, _localPlayerName);
 
                 _voice.Start(_audio.SelectedInputIndex, _audio.SelectedOutputIndex);
             }
 
-            var capture  = new MinimapCapture(new MinimapRegion
+            var capture = new MinimapCapture(new MinimapRegion
             {
                 X      = _config.MinimapX,
                 Y      = _config.MinimapY,
