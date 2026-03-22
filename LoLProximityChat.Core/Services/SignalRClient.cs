@@ -7,11 +7,9 @@ namespace LoLProximityChat.Core.Services
         private HubConnection? _connection;
         private readonly string _serverUrl;
 
-        public event Action<string>? OnPlayerJoined;
-        public event Action<string>? OnPlayerLeft;
-        public event Action<string, float, float>? OnPositionUpdated;
-        public event Action<string, Dictionary<string, float>>? OnVolumesUpdated;
-
+        public event Action<string>?                     OnPlayerJoined;
+        public event Action<string>?                     OnPlayerLeft;
+        public event Action<Dictionary<string, float>>?  OnVolumesUpdated;
 
         public SignalRClient(string serverUrl)
         {
@@ -27,10 +25,8 @@ namespace LoLProximityChat.Core.Services
 
             _connection.On<string>("PlayerJoined", name => OnPlayerJoined?.Invoke(name));
             _connection.On<string>("PlayerLeft",   name => OnPlayerLeft?.Invoke(name));
-            _connection.On<string, float, float>("PositionUpdated", (name, x, y) =>
-                OnPositionUpdated?.Invoke(name, x, y));
-            _connection.On<string, Dictionary<string, float>>("VolumesUpdated",
-                (listenerName, volumes) => OnVolumesUpdated?.Invoke(listenerName, volumes));
+            _connection.On<Dictionary<string, float>>("VolumesUpdated",
+                volumes => OnVolumesUpdated?.Invoke(volumes));
 
             try
             {

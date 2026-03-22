@@ -17,9 +17,7 @@ namespace LoLProximityChat.Core.Services
     public class MinimapCapture : IDisposable
     {
         private readonly MinimapRegion _region;
-
-        private static readonly Scalar GreenMin = new(40,  150, 150);
-        private static readonly Scalar GreenMax = new(80,  255, 255);
+        
         private static readonly Scalar BlueMin  = new(95,  80,  80);
         private static readonly Scalar BlueMax  = new(135, 255, 255);
         private static readonly Scalar RedMin1  = new(0,   80,  80);

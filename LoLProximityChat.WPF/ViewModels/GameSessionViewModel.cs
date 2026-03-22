@@ -8,6 +8,7 @@ namespace LoLProximityChat.WPF.ViewModels
         private readonly SignalRClient _signalR;
         private readonly ProximityCalculator _proximity = new();
         private readonly AppConfig _config = AppConfig.Load();
+        private readonly PositionTracker _tracker = new();
 
         private string _currentGameId = "";
         private string _localPlayerName = "";
@@ -36,20 +37,26 @@ namespace LoLProximityChat.WPF.ViewModels
                 await _signalR.JoinGameAsync(_currentGameId, state.LocalPlayerName);
             }
 
-            // Capture minimap + envoi position
-            var capture  = new MinimapCapture(new MinimapRegion
+            // Capture minimap + mapping
+            var capture   = new MinimapCapture(new MinimapRegion
             {
                 X      = _config.MinimapX,
                 Y      = _config.MinimapY,
                 Width  = _config.MinimapSize,
                 Height = _config.MinimapSize
             });
-            var blobs    = capture.DetectBlobs();
+            var blobs     = capture.DetectBlobs();
             var positions = _proximity.MapBlobsToPlayers(blobs, state.Players);
 
+            // Trouver la position du joueur local + stabiliser
             var localPos = positions.FirstOrDefault(p => p.SummonerName == _localPlayerName);
             if (localPos?.IsVisible == true)
-                await _signalR.UpdatePositionAsync(_currentGameId, _localPlayerName, localPos.X, localPos.Y);
+            {
+                var stable = _tracker.TryUpdate(localPos.X, localPos.Y);
+                if (stable.HasValue)
+                    await _signalR.UpdatePositionAsync(
+                        _currentGameId, _localPlayerName, stable.Value.x, stable.Value.y);
+            }
         }
 
         public async Task OnGameEndedAsync()
@@ -58,6 +65,7 @@ namespace LoLProximityChat.WPF.ViewModels
             _currentGameId   = "";
             _localPlayerName = "";
             _isConnected     = false;
+            _tracker.Reset();
         }
 
         private static string GenerateGameId(List<PlayerInfo> players)
