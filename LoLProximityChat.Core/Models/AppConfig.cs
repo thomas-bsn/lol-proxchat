@@ -7,7 +7,7 @@ namespace LoLProximityChat.Core.Models
         public int MinimapX      { get; set; }
         public int MinimapY      { get; set; }
         public int MinimapSize   { get; set; }
-        public string ServerUrl { get; set; } = "http://localhost:5128";
+        public string ServerUrl { get; set; } = "https://lol-proxchat-production.up.railway.app"; // http://localhost:5128 dev
 
         private static readonly string ConfigPath =
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),

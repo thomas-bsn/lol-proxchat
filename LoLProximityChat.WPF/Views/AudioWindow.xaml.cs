@@ -18,6 +18,24 @@ namespace LoLProximityChat.WPF.Views
         }
 
         private void OnSaveServerUrl(object sender, RoutedEventArgs e)
-            => (DataContext as AudioViewModel)?.SaveServerUrl();
+        {
+            var vm = DataContext as AudioViewModel;
+            if (vm is null) return;
+
+            var changed = vm.SaveServerUrl();
+
+            if (changed)
+                MessageBox.Show(
+                    "URL sauvegardée.\nRedémarre l'application pour te connecter au nouveau serveur.",
+                    "Redémarrage requis",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            else
+                MessageBox.Show(
+                    "URL sauvegardée.",
+                    "Sauvegardé",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+        }
     }
 }

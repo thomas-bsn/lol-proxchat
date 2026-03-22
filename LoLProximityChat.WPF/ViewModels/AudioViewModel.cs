@@ -85,11 +85,13 @@ namespace LoLProximityChat.WPF.ViewModels
             set { _serverUrl = value; OnPropertyChanged(); }
         }
 
-        public void SaveServerUrl()
+        public bool SaveServerUrl()
         {
-            var config    = AppConfig.Load();
+            var config = AppConfig.Load();
+            var changed = config.ServerUrl != ServerUrl;
             config.ServerUrl = ServerUrl;
             config.Save();
+            return changed;
         }
 
         // ── Init ──────────────────────────────────────────────────────────────
