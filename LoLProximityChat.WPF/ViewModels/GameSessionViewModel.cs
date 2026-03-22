@@ -34,8 +34,16 @@ namespace LoLProximityChat.WPF.ViewModels
                     await _signalR.SendAudioAsync(_currentGameId, _localPlayerName, data);
             };
 
+            // UNIQUE handler OnAudioReceived — avec auto-découverte
             _signalR.OnAudioReceived += (playerName, data) =>
+            {
+                if (!_voice.GetPlayerNames().Contains(playerName))
+                {
+                    _voice.AddPlayer(playerName, _audio.SelectedOutputIndex);
+                    _audio.AddPlayer(playerName);
+                }
                 _voice.ReceiveAudio(playerName, data);
+            };
 
             _signalR.OnVolumesUpdated += volumes =>
             {
@@ -46,18 +54,23 @@ namespace LoLProximityChat.WPF.ViewModels
             _signalR.OnPlayerJoined += playerName =>
             {
                 if (playerName == _localPlayerName) return;
-                _voice.AddPlayer(playerName, _audio.SelectedOutputIndex);
-                _audio.AddPlayer(playerName);
+                if (!_voice.GetPlayerNames().Contains(playerName))
+                {
+                    _voice.AddPlayer(playerName, _audio.SelectedOutputIndex);
+                    _audio.AddPlayer(playerName);
+                }
             };
 
-            // NOUVEAU — joueurs déjà présents quand on rejoint
             _signalR.OnExistingPlayers += players =>
             {
                 foreach (var name in players)
                 {
                     if (name == _localPlayerName) continue;
-                    _voice.AddPlayer(name, _audio.SelectedOutputIndex);
-                    _audio.AddPlayer(name);
+                    if (!_voice.GetPlayerNames().Contains(name))
+                    {
+                        _voice.AddPlayer(name, _audio.SelectedOutputIndex);
+                        _audio.AddPlayer(name);
+                    }
                 }
             };
 
@@ -79,6 +92,8 @@ namespace LoLProximityChat.WPF.ViewModels
                 await _signalR.ConnectAsync();
                 await Task.Delay(500);
             }
+            
+            Console.WriteLine($"[DEBUG] Players.Count={state.Players.Count} | gameId={_currentGameId}");
 
             // FIX : >= 2 au lieu de == "" seulement, pour ne pas hasher une liste incomplète
             if (_currentGameId == "" && state.Players.Count >= 2 && state.LocalPlayerName != "")
