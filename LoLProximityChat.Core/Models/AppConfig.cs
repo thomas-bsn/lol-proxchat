@@ -4,10 +4,11 @@ namespace LoLProximityChat.Core.Models
 {
     public class AppConfig
     {
-        public int MinimapX      { get; set; }
-        public int MinimapY      { get; set; }
-        public int MinimapSize   { get; set; }
-        public string ServerUrl { get; set; } = "https://lol-proxchat-production.up.railway.app"; // http://localhost:5128 dev
+        public int    MinimapX         { get; set; }
+        public int    MinimapY         { get; set; }
+        public int    MinimapSize      { get; set; }
+        public string ServerUrl        { get; set; } = "https://lol-proxchat-production.up.railway.app";
+        public string MyDiscordUsername { get; set; } = ""; // ex: "thomas_bsn"
 
         private static readonly string ConfigPath =
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -38,7 +39,7 @@ namespace LoLProximityChat.Core.Models
         {
             var screenW = (int)System.Windows.Forms.Screen.PrimaryScreen!.Bounds.Width;
             var screenH = (int)System.Windows.Forms.Screen.PrimaryScreen!.Bounds.Height;
-            var size = (int)(screenH * 0.1525);
+            var size    = (int)(screenH * 0.1525);
             return new AppConfig
             {
                 MinimapX    = screenW - size - 4,

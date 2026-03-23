@@ -12,27 +12,31 @@ namespace LoLProximityChat.Server.Hubs
             _rooms = rooms;
         }
 
-        public async Task JoinGame(string gameId, string playerName)
+        public async Task JoinGame(string gameId, string playerName, string discordUsername)
         {
-            // Récupère les joueurs déjà présents AVANT d'ajouter le nouveau
-            var existing = _rooms.GetPlayerNames(gameId);
+            var existing       = _rooms.GetPlayerNames(gameId);
+            var discordMapping = _rooms.GetDiscordMapping(gameId);
 
             await Groups.AddToGroupAsync(Context.ConnectionId, gameId);
-            _rooms.AddPlayer(Context.ConnectionId, playerName, gameId);
+            _rooms.AddPlayer(Context.ConnectionId, playerName, gameId, discordUsername);
 
-            // Notifie les AUTRES que ce joueur arrive (pas lui-même)
-            await Clients.OthersInGroup(gameId).SendAsync("PlayerJoined", playerName);
+            // Notifie les autres
+            await Clients.OthersInGroup(gameId).SendAsync("PlayerJoined", playerName, discordUsername);
 
-            // Envoie au nouveau arrivant la liste des joueurs déjà là
+            // Envoie au nouveau : joueurs présents + leur mapping Discord
             await Clients.Caller.SendAsync("ExistingPlayers", existing);
+            await Clients.Caller.SendAsync("DiscordMapping", discordMapping);
 
-            Console.WriteLine($"[JOIN] {playerName} → room {gameId} | déjà présents : {string.Join(", ", existing)}");
+            // Envoie à tout le monde le mapping mis à jour (le nouveau vient d'arriver)
+            var fullMapping = _rooms.GetDiscordMapping(gameId);
+            await Clients.Group(gameId).SendAsync("DiscordMapping", fullMapping);
+
+            Console.WriteLine($"[JOIN] {playerName} ({discordUsername}) → room {gameId} | déjà présents : {string.Join(", ", existing)}");
         }
 
         public async Task UpdatePosition(string gameId, string playerName, float x, float y)
         {
             _rooms.UpdatePosition(gameId, playerName, x, y);
-            Console.WriteLine($"[POS] {DateTime.Now:HH:mm:ss} {playerName} → ({x:F0}, {y:F0})");
 
             var volumeMap = _rooms.ComputeVolumes(gameId);
             foreach (var (_, (connId, volumes)) in volumeMap)
@@ -41,14 +45,12 @@ namespace LoLProximityChat.Server.Hubs
 
         public async Task SendAudio(string gameId, string playerName, byte[] audioData)
         {
-            Console.WriteLine($"[AUDIO] {playerName} → {audioData.Length} bytes");
             await Clients.OthersInGroup(gameId).SendAsync("ReceiveAudio", playerName, audioData);
         }
 
         public async Task RegisterEndpoint(string gameId, string playerName, string ip, int port)
         {
             await Clients.Group(gameId).SendAsync("PeerEndpoint", playerName, ip, port);
-            Console.WriteLine($"[ENDPOINT] {playerName} → {ip}:{port}");
         }
 
         public async Task LeaveGame(string gameId, string playerName)

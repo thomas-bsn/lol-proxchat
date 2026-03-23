@@ -10,11 +10,13 @@ namespace LoLProximityChat.WPF.ViewModels
         private readonly LiveApiPoller _poller  = new();
         private readonly SignalRClient _signalR = new(AppConfig.Load().ServerUrl);
 
-        public AudioViewModel      Audio      { get; } = new();
-        public PlayerListViewModel PlayerList { get; } = new();
-        public GameSessionViewModel Session   { get; private set; } = null!;
+        public AudioViewModel       Audio      { get; } = new();
+        public PlayerListViewModel  PlayerList { get; } = new();
+        public GameSessionViewModel Session    { get; private set; } = null!;
 
-        // ── Master volume (délégué à AudioViewModel) ──────────────────────────
+        // NOUVEAU — exposé pour AudioWindow
+        public string LocalPlayerName => Session?.LocalPlayerName ?? "";
+
         public float MasterVolume
         {
             get => Audio.MasterVolume;
@@ -22,7 +24,6 @@ namespace LoLProximityChat.WPF.ViewModels
         }
         public int MasterVolumePercent => Audio.MasterVolumePercent;
 
-        // ── Reconnecter ───────────────────────────────────────────────────────
         private bool _isReconnecting;
         public bool IsReconnecting
         {
@@ -39,7 +40,6 @@ namespace LoLProximityChat.WPF.ViewModels
             IsReconnecting = false;
         }
 
-        // ── Bindable properties ───────────────────────────────────────────────
         private bool _isInGame;
         public bool IsInGame
         {
@@ -62,7 +62,6 @@ namespace LoLProximityChat.WPF.ViewModels
             set { _statusText = value; OnPropertyChanged(); }
         }
 
-        // ── Init ──────────────────────────────────────────────────────────────
         public MainViewModel()
         {
             Session = new GameSessionViewModel(_signalR, Audio);
@@ -82,7 +81,6 @@ namespace LoLProximityChat.WPF.ViewModels
             _poller.Start();
         }
 
-        // ── Handlers ──────────────────────────────────────────────────────────
         private void OnGameStarted()
         {
             IsInGame   = true;
@@ -93,7 +91,6 @@ namespace LoLProximityChat.WPF.ViewModels
         {
             IsInGame   = false;
             StatusText = "En attente d'une game...";
-
             await Session.OnGameEndedAsync();
             PlayerList.Clear();
         }
@@ -101,12 +98,10 @@ namespace LoLProximityChat.WPF.ViewModels
         private async void OnStateChanged(GameState state)
         {
             if (!state.IsInGame) return;
-
             await Session.OnStateAsync(state);
             PlayerList.Update(state);
         }
 
-        // ── INotifyPropertyChanged ────────────────────────────────────────────
         public event PropertyChangedEventHandler? PropertyChanged;
         private void OnPropertyChanged([CallerMemberName] string? name = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));

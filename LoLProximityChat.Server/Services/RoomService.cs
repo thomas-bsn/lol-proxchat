@@ -2,22 +2,24 @@
 {
     public class RoomService
     {
-        private readonly Dictionary<string, Dictionary<string, (float x, float y)>> _rooms = new();
-        private readonly Dictionary<string, string> _connectionToPlayer = new();
-        private readonly Dictionary<string, string> _playerToConnection = new();
-        private readonly Dictionary<string, string> _connectionToGame = new(); // NOUVEAU
+        private readonly Dictionary<string, Dictionary<string, (float x, float y)>> _rooms          = new();
+        private readonly Dictionary<string, string> _connectionToPlayer   = new();
+        private readonly Dictionary<string, string> _playerToConnection   = new();
+        private readonly Dictionary<string, string> _connectionToGame     = new();
+        private readonly Dictionary<string, string> _playerToDiscord      = new(); // NOUVEAU
         private readonly object _lock = new();
 
-        public void AddPlayer(string connectionId, string playerName, string gameId)
+        public void AddPlayer(string connectionId, string playerName, string gameId, string discordUsername)
         {
             lock (_lock)
             {
                 if (!_rooms.ContainsKey(gameId))
                     _rooms[gameId] = new();
-                _connectionToPlayer[connectionId] = playerName;
-                _playerToConnection[playerName]   = connectionId;
-                _connectionToGame[connectionId]   = gameId;
-                _rooms[gameId][playerName]        = (0f, 0f); // ← AJOUT
+                _connectionToPlayer[connectionId]  = playerName;
+                _playerToConnection[playerName]    = connectionId;
+                _connectionToGame[connectionId]    = gameId;
+                _playerToDiscord[playerName]       = discordUsername; // NOUVEAU
+                _rooms[gameId][playerName]         = (0f, 0f);
             }
         }
 
@@ -28,7 +30,8 @@
                 if (!_connectionToPlayer.TryGetValue(connectionId, out var playerName)) return;
                 _connectionToPlayer.Remove(connectionId);
                 _playerToConnection.Remove(playerName);
-                _connectionToGame.Remove(connectionId); // NOUVEAU
+                _connectionToGame.Remove(connectionId);
+                _playerToDiscord.Remove(playerName); // NOUVEAU
 
                 foreach (var room in _rooms.Values)
                     room.Remove(playerName);
@@ -47,7 +50,6 @@
             }
         }
 
-        // NOUVEAU
         public List<string> GetPlayerNames(string gameId)
         {
             lock (_lock)
@@ -57,7 +59,20 @@
             }
         }
 
-        // NOUVEAU
+        // NOUVEAU — retourne le mapping LoL → Discord pour tous les joueurs de la room
+        public Dictionary<string, string> GetDiscordMapping(string gameId)
+        {
+            lock (_lock)
+            {
+                if (!_rooms.TryGetValue(gameId, out var room)) return new();
+                var mapping = new Dictionary<string, string>();
+                foreach (var playerName in room.Keys)
+                    if (_playerToDiscord.TryGetValue(playerName, out var discord) && discord != "")
+                        mapping[playerName] = discord;
+                return mapping;
+            }
+        }
+
         public string? GetGameId(string connectionId)
         {
             lock (_lock)
@@ -118,7 +133,7 @@
                 MathF.Pow(listener.y - speaker.y, 2));
             if (distance >= maxRange) return 0f;
             var volume = 1f - (distance / maxRange);
-            return MathF.Pow(volume, 2); // courbe quadratique douce
+            return MathF.Pow(volume, 2);
         }
     }
 }

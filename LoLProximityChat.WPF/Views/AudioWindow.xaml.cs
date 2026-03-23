@@ -21,21 +21,26 @@ namespace LoLProximityChat.WPF.Views
         {
             var vm = DataContext as AudioViewModel;
             if (vm is null) return;
-
             var changed = vm.SaveServerUrl();
+            System.Windows.MessageBox.Show(
+                changed
+                    ? "URL sauvegardée.\nRedémarre l'application pour te connecter au nouveau serveur."
+                    : "URL sauvegardée.",
+                changed ? "Redémarrage requis" : "Sauvegardé",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
 
-            if (changed)
-                System.Windows.MessageBox.Show(
-                    "URL sauvegardée.\nRedémarre l'application pour te connecter au nouveau serveur.",
-                    "Redémarrage requis",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-            else
-                System.Windows.MessageBox.Show(
-                    "URL sauvegardée.",
-                    "Sauvegardé",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+        private void OnSaveMyDiscord(object sender, RoutedEventArgs e)
+        {
+            var vm = DataContext as AudioViewModel;
+            if (vm is null) return;
+            vm.SaveMyDiscord();
+            System.Windows.MessageBox.Show(
+                "Pseudo Discord sauvegardé.",
+                "Sauvegardé",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
         }
     }
 }

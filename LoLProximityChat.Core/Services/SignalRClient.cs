@@ -7,15 +7,15 @@ namespace LoLProximityChat.Core.Services
         private HubConnection? _connection;
         private readonly string _serverUrl;
 
-        public event Action<string>?                    OnPlayerJoined;
-        public event Action<string>?                    OnPlayerLeft;
-        public event Action<Dictionary<string, float>>? OnVolumesUpdated;
-        public event Action<string, byte[]>?            OnAudioReceived;
-        public event Action<bool>?                      OnConnectionChanged;
-        // Ajoute l'event
-        public event Action? OnReconnected;
-        public event Action<string, string, int>?       OnPeerEndpoint;
-        public event Action<List<string>>?              OnExistingPlayers; // NOUVEAU
+        public event Action<string>?                         OnPlayerJoined;
+        public event Action<string>?                         OnPlayerLeft;
+        public event Action<Dictionary<string, float>>?      OnVolumesUpdated;
+        public event Action<string, byte[]>?                 OnAudioReceived;
+        public event Action<bool>?                           OnConnectionChanged;
+        public event Action?                                 OnReconnected;
+        public event Action<string, string, int>?            OnPeerEndpoint;
+        public event Action<List<string>>?                   OnExistingPlayers;
+        public event Action<Dictionary<string, string>>?     OnDiscordMapping; // NOUVEAU
 
         public SignalRClient(string serverUrl)
         {
@@ -43,10 +43,11 @@ namespace LoLProximityChat.Core.Services
                 (name, ip, port) => OnPeerEndpoint?.Invoke(name, ip, port));
             _connection.On<string, byte[]>("ReceiveAudio",
                 (name, data) => OnAudioReceived?.Invoke(name, data));
-            _connection.On<List<string>>("ExistingPlayers",          // NOUVEAU
+            _connection.On<List<string>>("ExistingPlayers",
                 names => OnExistingPlayers?.Invoke(names));
-            
-            // SignalRClient.cs
+            _connection.On<Dictionary<string, string>>("DiscordMapping", // NOUVEAU
+                mapping => OnDiscordMapping?.Invoke(mapping));
+
             _connection.Reconnected  += async _ =>
             {
                 OnConnectionChanged?.Invoke(true);
@@ -77,6 +78,12 @@ namespace LoLProximityChat.Core.Services
             Console.WriteLine("[SignalR] Impossible de se connecter après 5 tentatives.");
         }
 
+        public async Task JoinGameAsync(string gameId, string playerName, string discordUsername)
+        {
+            if (_connection is null || _connection.State != HubConnectionState.Connected) return;
+            await _connection.InvokeAsync("JoinGame", gameId, playerName, discordUsername);
+        }
+
         public async Task SendAudioAsync(string gameId, string playerName, byte[] data)
         {
             if (_connection is null || _connection.State != HubConnectionState.Connected) return;
@@ -87,12 +94,6 @@ namespace LoLProximityChat.Core.Services
         {
             if (_connection is null || _connection.State != HubConnectionState.Connected) return;
             await _connection.InvokeAsync("RegisterEndpoint", gameId, playerName, ip, port);
-        }
-
-        public async Task JoinGameAsync(string gameId, string playerName)
-        {
-            if (_connection is null || _connection.State != HubConnectionState.Connected) return;
-            await _connection.InvokeAsync("JoinGame", gameId, playerName);
         }
 
         public async Task UpdatePositionAsync(string gameId, string playerName, float x, float y)

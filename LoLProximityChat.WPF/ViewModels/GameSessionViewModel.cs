@@ -6,91 +6,75 @@ namespace LoLProximityChat.WPF.ViewModels
 {
     public class GameSessionViewModel : IAsyncDisposable
     {
-        private readonly SignalRClient    _signalR;
+        private readonly SignalRClient       _signalR;
         private readonly ProximityCalculator _proximity = new();
-        private readonly AppConfig        _config   = AppConfig.Load();
-        private readonly PositionTracker  _tracker  = new();
-        private readonly VoiceChatService _voice    = new();
-        private readonly AudioViewModel   _audio;
+        private readonly AppConfig           _config    = AppConfig.Load();
+        private readonly PositionTracker     _tracker   = new();
+        private readonly DiscordRpcService   _discord   = new("989513523359006800");
+        private readonly AudioViewModel      _audioVm;
+
+        // Mapping LoL → Discord username reçu du serveur
+        private Dictionary<string, string> _discordMapping = new();
 
         public event Action<bool>? OnServerConnectionChanged;
 
         private string _currentGameId   = "";
         private string _localPlayerName = "";
+        public  string LocalPlayerName  => _localPlayerName;
         private bool   _isConnected     = false;
 
-        public GameSessionViewModel(SignalRClient signalR, AudioViewModel audio)
+        public GameSessionViewModel(SignalRClient signalR, AudioViewModel audioVm)
         {
             _signalR = signalR;
-            _audio   = audio;
+            _audioVm = audioVm;
 
-            _audio.MuteMicRequested    += muted  => _voice.IsMuted = muted;
-            _audio.MasterVolumeChanged += volume => _voice.SetMasterVolume(volume);
-            _audio.MicVolumeChanged    += volume => _voice.SetMicVolume(volume);
-
-            _voice.OnAudioCaptured += async data =>
+            // Reçoit le mapping LoL → Discord du serveur
+            _signalR.OnDiscordMapping += mapping =>
             {
-                if (_currentGameId != "")
-                    await _signalR.SendAudioAsync(_currentGameId, _localPlayerName, data);
+                _discordMapping = mapping;
+                App.Current.Dispatcher.Invoke(() => _audioVm.ApplyDiscordMapping(mapping));
             };
 
-            // UNIQUE handler OnAudioReceived — avec auto-découverte
-            _signalR.OnAudioReceived += (playerName, data) =>
+            _signalR.OnVolumesUpdated += async volumes =>
             {
-                if (!_voice.GetPlayerNames().Contains(playerName))
+                // Applique les volumes via Discord RPC
+                foreach (var (lolName, volume) in volumes)
                 {
-                    _voice.AddPlayer(playerName, _audio.SelectedOutputIndex);
-                    _audio.AddPlayer(playerName);
+                    if (!_discordMapping.TryGetValue(lolName, out var discordUsername)) continue;
+                    if (!_discord.VoiceMembers.TryGetValue(discordUsername, out var userId)) continue;
+                    await _discord.SetUserVolumeAsync(userId, volume);
                 }
-                _voice.ReceiveAudio(playerName, data);
-            };
 
-            _signalR.OnVolumesUpdated += volumes =>
-            {
-                _voice.UpdateVolumes(volumes);
-                _audio.UpdateVolumes(volumes);
-            };
-            
-            _signalR.OnReconnected += async () =>
-            {
-                if (_currentGameId != "" && _localPlayerName != "")
-                {
-                    await _signalR.JoinGameAsync(_currentGameId, _localPlayerName);
-                    Console.WriteLine($"[REJOIN] {_localPlayerName} → room {_currentGameId}");
-                }
+                _audioVm.UpdateVolumes(volumes);
             };
 
             _signalR.OnPlayerJoined += playerName =>
             {
-                if (playerName == _localPlayerName) return;
-                if (!_voice.GetPlayerNames().Contains(playerName))
-                {
-                    _voice.AddPlayer(playerName, _audio.SelectedOutputIndex);
-                    _audio.AddPlayer(playerName);
-                }
+                if (playerName != _localPlayerName)
+                    _audioVm.AddPlayer(playerName);
             };
 
             _signalR.OnExistingPlayers += players =>
             {
                 foreach (var name in players)
-                {
-                    if (name == _localPlayerName) continue;
-                    if (!_voice.GetPlayerNames().Contains(name))
-                    {
-                        _voice.AddPlayer(name, _audio.SelectedOutputIndex);
-                        _audio.AddPlayer(name);
-                    }
-                }
+                    if (name != _localPlayerName)
+                        _audioVm.AddPlayer(name);
             };
 
             _signalR.OnPlayerLeft += playerName =>
-            {
-                _voice.RemovePlayer(playerName);
-                _audio.RemovePlayer(playerName);
-            };
+                _audioVm.RemovePlayer(playerName);
 
             _signalR.OnConnectionChanged += connected =>
                 OnServerConnectionChanged?.Invoke(connected);
+
+            _signalR.OnReconnected += async () =>
+            {
+                if (_currentGameId != "" && _localPlayerName != "")
+                {
+                    await _signalR.JoinGameAsync(_currentGameId, _localPlayerName, _config.MyDiscordUsername);
+                    Console.WriteLine($"[REJOIN] {_localPlayerName} → room {_currentGameId}");
+                }
+            };
         }
 
         public async Task OnStateAsync(GameState state)
@@ -99,21 +83,17 @@ namespace LoLProximityChat.WPF.ViewModels
             {
                 _isConnected = true;
                 await _signalR.ConnectAsync();
+                await _discord.ConnectAsync();
                 await Task.Delay(500);
             }
-            
-            Console.WriteLine($"[DEBUG] Count={state.Players.Count} | Local='{state.LocalPlayerName}' | gameId='{_currentGameId}'");
 
-            // FIX : >= 2 au lieu de == "" seulement, pour ne pas hasher une liste incomplète
             if (_currentGameId == "" && state.Players.Count >= 2 && state.LocalPlayerName != "")
             {
                 _localPlayerName = state.LocalPlayerName;
                 _currentGameId   = GenerateGameId(state.Players);
+                Console.WriteLine($"[GAMEID] {_currentGameId}");
 
-                Console.WriteLine($"[GAMEID] {_currentGameId} (gameTime={state.GameTime:F0}s)");
-
-                await _signalR.JoinGameAsync(_currentGameId, _localPlayerName);
-                _voice.Start(_audio.SelectedInputIndex, _audio.SelectedOutputIndex);
+                await _signalR.JoinGameAsync(_currentGameId, _localPlayerName, _config.MyDiscordUsername);
             }
 
             var capture = new MinimapCapture(new MinimapRegion
@@ -127,7 +107,7 @@ namespace LoLProximityChat.WPF.ViewModels
             var positions = _proximity.MapBlobsToPlayers(blobs, state.Players);
 
             var localPos = positions.FirstOrDefault(p => p.SummonerName == _localPlayerName);
-            if (localPos?.IsVisible == true)
+            if (localPos?.IsVisible == true && _currentGameId != "")
             {
                 var stable = _tracker.TryUpdate(localPos.X, localPos.Y);
                 if (stable.HasValue)
@@ -135,12 +115,11 @@ namespace LoLProximityChat.WPF.ViewModels
                         _currentGameId, _localPlayerName, stable.Value.x, stable.Value.y);
             }
         }
-        
+
         private static string GenerateGameId(List<PlayerInfo> players)
         {
             var names = players.Select(p => p.SummonerName).OrderBy(n => n);
-            var key = string.Join("_", names);
-    
+            var key   = string.Join("_", names);
             var bytes = System.Security.Cryptography.SHA256.HashData(
                 System.Text.Encoding.UTF8.GetBytes(key));
             return Convert.ToHexString(bytes)[..8];
@@ -157,9 +136,11 @@ namespace LoLProximityChat.WPF.ViewModels
 
         public async Task OnGameEndedAsync()
         {
-            _voice.Dispose();
-            await _signalR.LeaveGameAsync(_currentGameId, _localPlayerName);
+            // Remet tous les volumes Discord à 100% en fin de game
+            foreach (var (_, userId) in _discord.VoiceMembers)
+                await _discord.SetUserVolumeAsync(userId, 1f);
 
+            await _signalR.LeaveGameAsync(_currentGameId, _localPlayerName);
             _currentGameId   = "";
             _localPlayerName = "";
             _isConnected     = false;
@@ -168,7 +149,7 @@ namespace LoLProximityChat.WPF.ViewModels
 
         public async ValueTask DisposeAsync()
         {
-            _voice.Dispose();
+            _discord.Dispose();
             await _signalR.DisposeAsync();
         }
     }

@@ -8,7 +8,8 @@ namespace LoLProximityChat.WPF.ViewModels
 {
     public class PlayerAudioEntry : INotifyPropertyChanged
     {
-        public string Name { get; set; } = "";
+        public string Name        { get; set; } = "";
+        public string DiscordName { get; set; } = ""; // reçu du serveur, readonly
 
         private float _volume = 1f;
         public float Volume
@@ -39,7 +40,7 @@ namespace LoLProximityChat.WPF.ViewModels
         }
 
         public int    VolumePercent => (int)(_volume * 100);
-        public string MuteIcon     => _isMuted ? "🔇" : "🔊";
+        public string MuteIcon      => _isMuted ? "🔇" : "🔊";
 
         public event PropertyChangedEventHandler? PropertyChanged;
         private void OnPropertyChanged([CallerMemberName] string? n = null)
@@ -53,7 +54,6 @@ namespace LoLProximityChat.WPF.ViewModels
         public int SelectedInputIndex  => InputDevices.IndexOf(SelectedInput);
         public int SelectedOutputIndex => OutputDevices.IndexOf(SelectedOutput);
 
-        // ── Devices ───────────────────────────────────────────────────────────
         public ObservableCollection<string> InputDevices  { get; } = [];
         public ObservableCollection<string> OutputDevices { get; } = [];
 
@@ -69,6 +69,14 @@ namespace LoLProximityChat.WPF.ViewModels
         {
             get => _selectedOutput;
             set { _selectedOutput = value; OnPropertyChanged(); }
+        }
+
+        // ── Mon pseudo Discord ────────────────────────────────────────────────
+        private string _myDiscordName = "";
+        public string MyDiscordName
+        {
+            get => _myDiscordName;
+            set { _myDiscordName = value; OnPropertyChanged(); }
         }
 
         // ── Volume master ─────────────────────────────────────────────────────
@@ -99,7 +107,6 @@ namespace LoLProximityChat.WPF.ViewModels
             set { _isMicMuted = value; OnPropertyChanged(); OnPropertyChanged(nameof(MicMuteIcon)); }
         }
         public string MicMuteIcon => _isMicMuted ? "🔇" : "🎙";
-
         public event Action<bool>? MuteMicRequested;
 
         public void ToggleMicMute()
@@ -125,8 +132,35 @@ namespace LoLProximityChat.WPF.ViewModels
             return changed;
         }
 
+        // ── Sauvegarde uniquement mon pseudo Discord ──────────────────────────
+        public void SaveMyDiscord()
+        {
+            var config = AppConfig.Load();
+            config.MyDiscordUsername = MyDiscordName;
+            config.Save();
+        }
+
+        // ── Charge mon pseudo Discord depuis la config ────────────────────────
+        public void LoadMyDiscord()
+        {
+            var config  = AppConfig.Load();
+            MyDiscordName = config.MyDiscordUsername;
+        }
+
+        // ── Reçoit le mapping du serveur et met à jour l'affichage ───────────
+        public void ApplyDiscordMapping(Dictionary<string, string> mapping)
+        {
+            foreach (var player in Players)
+                if (mapping.TryGetValue(player.Name, out var discord))
+                    player.DiscordName = discord;
+        }
+
         // ── Init ──────────────────────────────────────────────────────────────
-        public AudioViewModel() => LoadDevices();
+        public AudioViewModel()
+        {
+            LoadDevices();
+            LoadMyDiscord();
+        }
 
         private void LoadDevices()
         {
@@ -142,7 +176,6 @@ namespace LoLProximityChat.WPF.ViewModels
             if (OutputDevices.Count > 0) SelectedOutput = OutputDevices[0];
         }
 
-        // ── Appelé par GameSessionViewModel ───────────────────────────────────
         public void UpdateVolumes(Dictionary<string, float> volumes)
         {
             foreach (var (name, volume) in volumes)

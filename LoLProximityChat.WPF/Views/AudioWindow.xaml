@@ -109,14 +109,49 @@
                     <TextBlock Text="Serveur" FontSize="13" FontWeight="SemiBold"
                                Foreground="#c89b3c" Margin="0,0,0,8"/>
                     <TextBlock Text="URL" FontSize="11" Foreground="#888"/>
-                    <TextBox Text="{Binding ServerUrl}" Background="#0f3460"
-                             Foreground="#e0e0e0" BorderBrush="#0f3460"
-                             Padding="6,4" Margin="0,4,0,8" FontFamily="Segoe UI"/>
+                    <TextBox Text="{Binding ServerUrl}"
+                             Background="#0f3460" Foreground="#e0e0e0"
+                             BorderBrush="#0f3460" Padding="6,4"
+                             Margin="0,4,0,8" FontFamily="Segoe UI"/>
                     <Button Content="Sauvegarder" Background="#c89b3c"
                             Foreground="#1a1a2e" BorderThickness="0"
                             Padding="12,6" FontWeight="SemiBold"
                             FontFamily="Segoe UI" Cursor="Hand"
                             Click="OnSaveServerUrl"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Discord -->
+            <Border Background="#16213e" CornerRadius="8" Padding="12" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="Discord" FontSize="13" FontWeight="SemiBold"
+                               Foreground="#c89b3c" Margin="0,0,0,8"/>
+                    <TextBlock Text="Mon pseudo Discord" FontSize="11" Foreground="#888"/>
+                    <Grid Margin="0,4,0,8">
+                        <TextBox Text="{Binding MyDiscordName, UpdateSourceTrigger=PropertyChanged}"
+                                 Background="#0f3460" Foreground="#e0e0e0"
+                                 BorderBrush="#0f3460" Padding="6,4"
+                                 FontFamily="Segoe UI"/>
+                        <TextBlock Text="ex: gslastplayer" Foreground="#555"
+                                   FontSize="12" Margin="8,5,0,0"
+                                   IsHitTestVisible="False">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding MyDiscordName}" Value="">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+                    <Button Content="Sauvegarder" Background="#c89b3c"
+                            Foreground="#1a1a2e" BorderThickness="0"
+                            Padding="12,6" FontWeight="SemiBold"
+                            FontFamily="Segoe UI" Cursor="Hand"
+                            Click="OnSaveMyDiscord"/>
                 </StackPanel>
             </Border>
 
@@ -196,6 +231,26 @@
                                             </TextBlock.Style>
                                         </TextBlock>
                                     </StackPanel>
+
+                                    <!-- Discord username reçu du serveur -->
+                                    <TextBlock Text="{Binding DiscordName}"
+                                               FontSize="11" Foreground="#555"
+                                               Margin="14,2,0,2">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding DiscordName}" Value="">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding DiscordName}" Value="{x:Null}">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+
                                     <TextBlock FontSize="11" Foreground="#888">
                                         <Run Text="{Binding VolumePercent, Mode=OneWay}"/>
                                         <Run Text="%"/>
