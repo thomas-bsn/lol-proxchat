@@ -50,6 +50,15 @@ namespace LoLProximityChat.WPF.ViewModels
                 _voice.UpdateVolumes(volumes);
                 _audio.UpdateVolumes(volumes);
             };
+            
+            _signalR.OnReconnected += async () =>
+            {
+                if (_currentGameId != "" && _localPlayerName != "")
+                {
+                    await _signalR.JoinGameAsync(_currentGameId, _localPlayerName);
+                    Console.WriteLine($"[REJOIN] {_localPlayerName} → room {_currentGameId}");
+                }
+            };
 
             _signalR.OnPlayerJoined += playerName =>
             {
@@ -129,13 +138,8 @@ namespace LoLProximityChat.WPF.ViewModels
         
         private static string GenerateGameId(List<PlayerInfo> players, float gameTime)
         {
-            // Arrondit à la minute inférieure → stable si les clients démarrent à ±59s d'écart
-            int minuteBucket = (int)(gameTime / 60f);
-
-            // Hash sur les noms triés + le bucket temps
             var names = players.Select(p => p.SummonerName).OrderBy(n => n);
-            var key   = $"{string.Join("_", names)}_{minuteBucket}";
-            return key.GetHashCode().ToString("X");
+            return string.Join("_", names).GetHashCode().ToString("X");
         }
 
         public async Task ReconnectAsync()

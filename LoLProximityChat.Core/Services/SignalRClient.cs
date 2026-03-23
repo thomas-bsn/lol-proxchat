@@ -12,6 +12,8 @@ namespace LoLProximityChat.Core.Services
         public event Action<Dictionary<string, float>>? OnVolumesUpdated;
         public event Action<string, byte[]>?            OnAudioReceived;
         public event Action<bool>?                      OnConnectionChanged;
+        // Ajoute l'event
+        public event Action? OnReconnected;
         public event Action<string, string, int>?       OnPeerEndpoint;
         public event Action<List<string>>?              OnExistingPlayers; // NOUVEAU
 
@@ -43,8 +45,14 @@ namespace LoLProximityChat.Core.Services
                 (name, data) => OnAudioReceived?.Invoke(name, data));
             _connection.On<List<string>>("ExistingPlayers",          // NOUVEAU
                 names => OnExistingPlayers?.Invoke(names));
-
-            _connection.Reconnected  += _ => { OnConnectionChanged?.Invoke(true);  return Task.CompletedTask; };
+            
+            // SignalRClient.cs
+            _connection.Reconnected  += async _ =>
+            {
+                OnConnectionChanged?.Invoke(true);
+                OnReconnected?.Invoke();
+                await Task.CompletedTask;
+            };
             _connection.Reconnecting += _ => { OnConnectionChanged?.Invoke(false); return Task.CompletedTask; };
             _connection.Closed       += _ => { OnConnectionChanged?.Invoke(false); return Task.CompletedTask; };
 
