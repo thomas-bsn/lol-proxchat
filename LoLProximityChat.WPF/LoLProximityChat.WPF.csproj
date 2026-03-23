@@ -8,6 +8,7 @@
         <RootNamespace>LoLProximityChat.WPF</RootNamespace>
         <ApplicationIcon>Views\Assets\icon.ico</ApplicationIcon>
         <UseWindowsForms>true</UseWindowsForms>
+        <EnableWindowsTargeting>true</EnableWindowsTargeting>
     </PropertyGroup>
 
     <ItemGroup>
@@ -36,5 +37,14 @@
 
     <ItemGroup>
       <Resource Include="Views\Assets\icon.ico" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Content Include="Core\Models\champion_classifier.onnx">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </Content>
+        <Content Include="Core\Models\champion_labels.json">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </Content>
     </ItemGroup>
 </Project>

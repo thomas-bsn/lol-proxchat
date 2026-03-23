@@ -6,23 +6,21 @@ namespace LoLProximityChat.WPF.ViewModels
 {
     public class GameSessionViewModel : IAsyncDisposable
     {
-        private readonly SignalRClient       _signalR;
-        private readonly ProximityCalculator _proximity = new();
-        private readonly AppConfig           _config    = AppConfig.Load();
-        private readonly PositionTracker     _tracker   = new();
+        private readonly SignalRClient _signalR;
+        private readonly AppConfig _config = AppConfig.Load();
         private readonly DiscordRpcService _discord;
+        private readonly MinimapTracker _tracker;
 
-        private readonly AudioViewModel      _audioVm;
+        private readonly AudioViewModel _audioVm;
 
-        // Mapping LoL → Discord username reçu du serveur
         private Dictionary<string, string> _discordMapping = new();
 
         public event Action<bool>? OnServerConnectionChanged;
 
-        private string _currentGameId   = "";
+        private string _currentGameId = "";
         private string _localPlayerName = "";
-        public  string LocalPlayerName  => _localPlayerName;
-        private bool   _isConnected     = false;
+        public string LocalPlayerName => _localPlayerName;
+        private bool _isConnected = false;
 
         public GameSessionViewModel(SignalRClient signalR, AudioViewModel audioVm)
         {
@@ -30,7 +28,12 @@ namespace LoLProximityChat.WPF.ViewModels
             _audioVm = audioVm;
             _discord = new DiscordRpcService(_config.DiscordClientId, _config.ServerUrl);
 
-            // Reçoit le mapping LoL → Discord du serveur
+            _tracker = new MinimapTracker(
+                _config.MinimapX,
+                _config.MinimapY,
+                _config.MinimapSize
+            );
+
             _signalR.OnDiscordMapping += mapping =>
             {
                 _discordMapping = mapping;
@@ -39,11 +42,14 @@ namespace LoLProximityChat.WPF.ViewModels
 
             _signalR.OnVolumesUpdated += async volumes =>
             {
-                // Applique les volumes via Discord RPC
                 foreach (var (lolName, volume) in volumes)
                 {
-                    if (!_discordMapping.TryGetValue(lolName, out var discordUsername)) continue;
-                    if (!_discord.VoiceMembers.TryGetValue(discordUsername, out var userId)) continue;
+                    if (!_discordMapping.TryGetValue(lolName, out var discordUsername))
+                        continue;
+
+                    if (!_discord.VoiceMembers.TryGetValue(discordUsername, out var userId))
+                        continue;
+
                     await _discord.SetUserVolumeAsync(userId, volume);
                 }
 
@@ -74,7 +80,6 @@ namespace LoLProximityChat.WPF.ViewModels
                 if (_currentGameId != "" && _localPlayerName != "")
                 {
                     await _signalR.JoinGameAsync(_currentGameId, _localPlayerName, _config.MyDiscordUsername);
-                    Console.WriteLine($"[REJOIN] {_localPlayerName} → room {_currentGameId}");
                 }
             };
         }
@@ -92,36 +97,37 @@ namespace LoLProximityChat.WPF.ViewModels
             if (_currentGameId == "" && state.Players.Count >= 2 && state.LocalPlayerName != "")
             {
                 _localPlayerName = state.LocalPlayerName;
-                _currentGameId   = GenerateGameId(state.Players);
-                Console.WriteLine($"[GAMEID] {_currentGameId}");
+                _currentGameId = GenerateGameId(state.Players);
 
                 await _signalR.JoinGameAsync(_currentGameId, _localPlayerName, _config.MyDiscordUsername);
+
+                // 🔥 Load ONNX model ici
+                _tracker.LoadModel(
+                    "Core/Models/champion_classifier.onnx",
+                    "Core/Models/champion_labels.json",
+                    state.LocalPlayer.ChampionName
+                );
             }
 
-            var capture = new MinimapCapture(new MinimapRegion
-            {
-                X      = _config.MinimapX,
-                Y      = _config.MinimapY,
-                Width  = _config.MinimapSize,
-                Height = _config.MinimapSize
-            });
-            var blobs     = capture.DetectBlobs();
-            var positions = _proximity.MapBlobsToPlayers(blobs, state.Players);
+            // 🔥 NOUVELLE LOGIQUE (REMPLACE TOUT)
+            var pos = _tracker.Tick();
 
-            var localPos = positions.FirstOrDefault(p => p.SummonerName == _localPlayerName);
-            if (localPos?.IsVisible == true && _currentGameId != "")
+            if (pos.HasValue && _currentGameId != "")
             {
-                var stable = _tracker.TryUpdate(localPos.X, localPos.Y);
-                if (stable.HasValue)
-                    await _signalR.UpdatePositionAsync(
-                        _currentGameId, _localPlayerName, stable.Value.x, stable.Value.y);
+                Console.WriteLine($"[TRACK] X={pos.Value.x:F0} Y={pos.Value.y:F0}");
+                await _signalR.UpdatePositionAsync(
+                    _currentGameId,
+                    _localPlayerName,
+                    pos.Value.x,
+                    pos.Value.y
+                );
             }
         }
 
         private static string GenerateGameId(List<PlayerInfo> players)
         {
             var names = players.Select(p => p.SummonerName).OrderBy(n => n);
-            var key   = string.Join("_", names);
+            var key = string.Join("_", names);
             var bytes = System.Security.Cryptography.SHA256.HashData(
                 System.Text.Encoding.UTF8.GetBytes(key));
             return Convert.ToHexString(bytes)[..8];
@@ -129,8 +135,8 @@ namespace LoLProximityChat.WPF.ViewModels
 
         public async Task ReconnectAsync()
         {
-            _isConnected     = false;
-            _currentGameId   = "";
+            _isConnected = false;
+            _currentGameId = "";
             _localPlayerName = "";
             _tracker.Reset();
             await _signalR.ConnectAsync();
@@ -138,19 +144,20 @@ namespace LoLProximityChat.WPF.ViewModels
 
         public async Task OnGameEndedAsync()
         {
-            // Remet tous les volumes Discord à 100% en fin de game
             foreach (var (_, userId) in _discord.VoiceMembers)
                 await _discord.SetUserVolumeAsync(userId, 1f);
 
             await _signalR.LeaveGameAsync(_currentGameId, _localPlayerName);
-            _currentGameId   = "";
+
+            _currentGameId = "";
             _localPlayerName = "";
-            _isConnected     = false;
+            _isConnected = false;
             _tracker.Reset();
         }
 
         public async ValueTask DisposeAsync()
         {
+            _tracker.Dispose();
             _discord.Dispose();
             await _signalR.DisposeAsync();
         }

@@ -4,6 +4,8 @@ namespace LoLProximityChat.Core.Services
 {
     public class ProximityCalculator
     {
+        private readonly Dictionary<string, (float x, float y)> _lastPositions = new();
+
         public List<PlayerMapPosition> MapBlobsToPlayers(
             List<(float x, float y, string team)> blobs,
             List<PlayerInfo> players)
@@ -15,8 +17,12 @@ namespace LoLProximityChat.Core.Services
             var orderBlobs   = blobs.Where(b => b.team == "ORDER").ToList();
             var chaosBlobs   = blobs.Where(b => b.team == "CHAOS").ToList();
 
-            AssignBlobsToPlayers(orderBlobs, orderPlayers, result);
-            AssignBlobsToPlayers(chaosBlobs, chaosPlayers, result);
+            AssignBlobsToPlayers(orderBlobs, orderPlayers, result, _lastPositions);
+            AssignBlobsToPlayers(chaosBlobs, chaosPlayers, result, _lastPositions);
+
+            // Met à jour les dernières positions connues
+            foreach (var p in result.Where(p => p.IsVisible))
+                _lastPositions[p.SummonerName] = (p.X, p.Y);
 
             return result;
         }
@@ -24,32 +30,47 @@ namespace LoLProximityChat.Core.Services
         private static void AssignBlobsToPlayers(
             List<(float x, float y, string team)> blobs,
             List<PlayerInfo> players,
-            List<PlayerMapPosition> result)
+            List<PlayerMapPosition> result,
+            Dictionary<string, (float x, float y)> lastPositions)
         {
-            var assigned = new HashSet<string>();
+            var usedBlobs = new HashSet<int>();
+            var assigned  = new HashSet<string>();
 
-            // TODO : utiliser la position précédente pour un meilleur matching
-            for (int i = 0; i < Math.Min(blobs.Count, players.Count); i++)
+            foreach (var player in players)
             {
-                var blob   = blobs[i];
-                var player = players[i];
+                // Référence = dernière position connue, ou centre de map par défaut
+                (float x, float y) reference = lastPositions.TryGetValue(player.SummonerName, out var last)
+                    ? last
+                    : (7500f, 7500f);
 
-                result.Add(new PlayerMapPosition
+                int   bestIdx  = -1;
+                float bestDist = float.MaxValue;
+
+                for (int i = 0; i < blobs.Count; i++)
                 {
-                    SummonerName = player.SummonerName,
-                    ChampionName = player.ChampionName,
-                    Team         = player.Team,
-                    X            = blob.x,
-                    Y            = blob.y,
-                    IsVisible    = true
-                });
+                    if (usedBlobs.Contains(i)) continue;
+                    var d = Dist(reference, (blobs[i].x, blobs[i].y));
+                    if (d < bestDist) { bestDist = d; bestIdx = i; }
+                }
 
-                assigned.Add(player.SummonerName);
+                if (bestIdx >= 0)
+                {
+                    usedBlobs.Add(bestIdx);
+                    assigned.Add(player.SummonerName);
+                    result.Add(new PlayerMapPosition
+                    {
+                        SummonerName = player.SummonerName,
+                        ChampionName = player.ChampionName,
+                        Team         = player.Team,
+                        X            = blobs[bestIdx].x,
+                        Y            = blobs[bestIdx].y,
+                        IsVisible    = true
+                    });
+                }
             }
 
             // Joueurs non assignés = fog of war
             foreach (var player in players.Where(p => !assigned.Contains(p.SummonerName)))
-            {
                 result.Add(new PlayerMapPosition
                 {
                     SummonerName = player.SummonerName,
@@ -59,7 +80,9 @@ namespace LoLProximityChat.Core.Services
                     Y            = -1,
                     IsVisible    = false
                 });
-            }
         }
+
+        private static float Dist((float x, float y) a, (float x, float y) b)
+            => MathF.Sqrt(MathF.Pow(a.x - b.x, 2) + MathF.Pow(a.y - b.y, 2));
     }
 }

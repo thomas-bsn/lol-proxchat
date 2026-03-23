@@ -104,17 +104,27 @@
                 connections = new(_playerToConnection);
             }
 
+            // LOG DIAGNOSTIC
+            Console.WriteLine($"[VOLUMES] Room {gameId} — {positions.Count} joueur(s) : {string.Join(", ", positions.Select(p => $"{p.Key}=({p.Value.x:F0},{p.Value.y:F0})"))}");
+
             var result = new Dictionary<string, (string, Dictionary<string, float>)>();
 
             foreach (var listener in positions)
             {
-                if (!connections.TryGetValue(listener.Key, out var connId)) continue;
+                if (!connections.TryGetValue(listener.Key, out var connId))
+                {
+                    Console.WriteLine($"[VOLUMES] SKIP {listener.Key} — pas de connectionId trouvé dans _playerToConnection");
+                    continue;
+                }
 
                 var volumes = new Dictionary<string, float>();
                 foreach (var speaker in positions)
                 {
                     if (speaker.Key == listener.Key) continue;
-                    volumes[speaker.Key] = CalculateVolume(listener.Value, speaker.Value);
+                    var dist = MathF.Sqrt(MathF.Pow(listener.Value.x - speaker.Value.x, 2) + MathF.Pow(listener.Value.y - speaker.Value.y, 2));
+                    var vol  = CalculateVolume(listener.Value, speaker.Value);
+                    Console.WriteLine($"[VOLUMES] {listener.Key} entend {speaker.Key} : distance={dist:F0} → volume={vol:F3}");
+                    volumes[speaker.Key] = vol;
                 }
 
                 result[listener.Key] = (connId, volumes);

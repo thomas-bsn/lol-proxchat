@@ -45,6 +45,7 @@ namespace LoLProximityChat.Core.Services
         public List<(float x, float y, string team)> DetectBlobs()
         {
             using var screen = CaptureScreen();
+            
 
             using var hsv = new Mat();
             Cv2.CvtColor(screen, hsv, ColorConversionCodes.BGR2HSV);
@@ -62,7 +63,7 @@ namespace LoLProximityChat.Core.Services
             var results = new List<(float x, float y, string team)>();
             results.AddRange(FindBlobs(maskBlue, "ORDER"));
             results.AddRange(FindBlobs(maskRed,  "CHAOS"));
-
+            Console.WriteLine($"[BLOBS] ORDER={results.Count(r => r.team == "ORDER")} CHAOS={results.Count(r => r.team == "CHAOS")} | positions: {string.Join(", ", results.Select(r => $"({r.x:F0},{r.y:F0})"))}");
             return results;
         }
 
@@ -130,6 +131,7 @@ namespace LoLProximityChat.Core.Services
             }
 
             GetWindowRect(hwnd, out RECT rect);
+            Console.WriteLine($"[CAPTURE] LoL window: {rect.Left},{rect.Top} {rect.Right-rect.Left}x{rect.Bottom-rect.Top} | crop: relX={_region.X - rect.Left} relY={_region.Y - rect.Top}");
             int winW = rect.Right  - rect.Left;
             int winH = rect.Bottom - rect.Top;
             
