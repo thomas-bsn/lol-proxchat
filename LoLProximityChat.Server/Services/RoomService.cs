@@ -112,7 +112,7 @@
             (float x, float y) listener,
             (float x, float y) speaker)
         {
-            const float maxRange = 3000f;
+            const float maxRange = 15000f;
             var distance = MathF.Sqrt(
                 MathF.Pow(listener.x - speaker.x, 2) +
                 MathF.Pow(listener.y - speaker.y, 2));

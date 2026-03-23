@@ -102,13 +102,13 @@ namespace LoLProximityChat.WPF.ViewModels
                 await Task.Delay(500);
             }
             
-            Console.WriteLine($"[DEBUG] Players.Count={state.Players.Count} | gameId={_currentGameId}");
+            Console.WriteLine($"[DEBUG] Count={state.Players.Count} | Local='{state.LocalPlayerName}' | gameId='{_currentGameId}'");
 
             // FIX : >= 2 au lieu de == "" seulement, pour ne pas hasher une liste incomplète
             if (_currentGameId == "" && state.Players.Count >= 2 && state.LocalPlayerName != "")
             {
                 _localPlayerName = state.LocalPlayerName;
-                _currentGameId   = GenerateGameId(state.Players, state.GameTime);
+                _currentGameId   = GenerateGameId(state.Players);
 
                 Console.WriteLine($"[GAMEID] {_currentGameId} (gameTime={state.GameTime:F0}s)");
 
@@ -136,10 +136,14 @@ namespace LoLProximityChat.WPF.ViewModels
             }
         }
         
-        private static string GenerateGameId(List<PlayerInfo> players, float gameTime)
+        private static string GenerateGameId(List<PlayerInfo> players)
         {
             var names = players.Select(p => p.SummonerName).OrderBy(n => n);
-            return string.Join("_", names).GetHashCode().ToString("X");
+            var key = string.Join("_", names);
+    
+            var bytes = System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(key));
+            return Convert.ToHexString(bytes)[..8];
         }
 
         public async Task ReconnectAsync()

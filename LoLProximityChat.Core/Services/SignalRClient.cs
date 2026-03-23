@@ -62,6 +62,7 @@ namespace LoLProximityChat.Core.Services
                 {
                     await _connection.StartAsync();
                     OnConnectionChanged?.Invoke(true);
+                    OnReconnected?.Invoke();
                     return;
                 }
                 catch (Exception ex)
