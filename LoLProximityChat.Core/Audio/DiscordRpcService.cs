@@ -6,21 +6,22 @@ namespace LoLProximityChat.Core.Audio
 {
     public class DiscordRpcService : IDisposable
     {
-        // username Discord → user_id Discord
         public Dictionary<string, string> VoiceMembers { get; private set; } = new();
         public event Action<Dictionary<string, string>>? OnVoiceMembersChanged;
 
         private readonly string _clientId;
+        private readonly string _serverUrl;
         private NamedPipeClientStream? _pipe;
         private CancellationTokenSource? _cts;
         private readonly SemaphoreSlim _writeLock = new(1, 1);
+        private bool _authorized = false;
 
-        public DiscordRpcService(string clientId)
+        public DiscordRpcService(string clientId, string serverUrl)
         {
-            _clientId = clientId;
+            _clientId  = clientId;
+            _serverUrl = serverUrl;
         }
 
-        // ── Connexion ─────────────────────────────────────────────────────────
         public async Task ConnectAsync()
         {
             _cts = new CancellationTokenSource();
@@ -44,7 +45,7 @@ namespace LoLProximityChat.Core.Audio
 
             if (_pipe == null)
             {
-                Console.WriteLine("[DISCORD RPC] Discord non trouvé — Discord est-il ouvert ?");
+                Console.WriteLine("[DISCORD RPC] Discord non trouvé");
                 return;
             }
 
@@ -52,31 +53,82 @@ namespace LoLProximityChat.Core.Audio
             _ = ReadLoopAsync(_cts.Token);
         }
 
-        // ── Handshake ─────────────────────────────────────────────────────────
         private async Task HandshakeAsync()
         {
             await WriteFrameAsync(0, new { v = 1, client_id = _clientId });
         }
 
-        // ── Volume par utilisateur ────────────────────────────────────────────
+        private async Task AuthorizeAsync()
+        {
+            await WriteFrameAsync(1, new
+            {
+                cmd   = "AUTHORIZE",
+                args  = new
+                {
+                    client_id = _clientId,
+                    scopes    = new[] { "rpc", "rpc.voice.read" }
+                },
+                nonce = Guid.NewGuid().ToString()
+            });
+        }
+
+        // Échange le code OAuth contre un token via Railway
+        private async Task<string?> ExchangeCodeAsync(string code)
+        {
+            try
+            {
+                using var http     = new System.Net.Http.HttpClient();
+                var payload        = JsonSerializer.Serialize(new { code });
+                var content        = new System.Net.Http.StringContent(
+                    payload, Encoding.UTF8, "application/json");
+                var response       = await http.PostAsync(
+                    $"{_serverUrl}/auth/discord/token", content);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    Console.WriteLine($"[DISCORD RPC] Échange token échoué: {response.StatusCode}");
+                    return null;
+                }
+
+                var json  = await response.Content.ReadAsStringAsync();
+                var doc   = JsonDocument.Parse(json);
+                var token = doc.RootElement.GetProperty("access_token").GetString();
+                Console.WriteLine("[DISCORD RPC] Token obtenu ✓");
+                return token;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DISCORD RPC] ExchangeCode erreur: {ex.Message}");
+                return null;
+            }
+        }
+
+        private async Task AuthenticateAsync(string accessToken)
+        {
+            await WriteFrameAsync(1, new
+            {
+                cmd   = "AUTHENTICATE",
+                args  = new { access_token = accessToken },
+                nonce = Guid.NewGuid().ToString()
+            });
+        }
+
         public async Task SetUserVolumeAsync(string userId, float volume)
         {
-            // volume 0.0-1.0 → Discord attend 0-200 (100 = normal)
-            int discordVolume = (int)Math.Clamp(volume * 200f, 0, 200);
-
+            if (!_authorized) return;
+            int discordVolume = (int)Math.Clamp(volume * 100f, 0, 100);
             await WriteFrameAsync(1, new
             {
                 cmd   = "SET_USER_VOICE_SETTINGS",
                 args  = new { user_id = userId, volume = discordVolume },
                 nonce = Guid.NewGuid().ToString()
             });
-
             Console.WriteLine($"[DISCORD RPC] Volume {userId} → {discordVolume}");
         }
 
-        // ── Récupère les membres du channel vocal ─────────────────────────────
         private async Task GetVoiceChannelAsync()
         {
+            if (!_authorized) return;
             await WriteFrameAsync(1, new
             {
                 cmd   = "GET_SELECTED_VOICE_CHANNEL",
@@ -87,27 +139,18 @@ namespace LoLProximityChat.Core.Audio
 
         private async Task SubscribeVoiceStateAsync()
         {
-            await WriteFrameAsync(1, new
+            if (!_authorized) return;
+            foreach (var evt in new[] { "VOICE_STATE_CREATE", "VOICE_STATE_UPDATE", "VOICE_STATE_DELETE" })
             {
-                cmd   = "SUBSCRIBE",
-                evt   = "VOICE_STATE_CREATE",
-                nonce = Guid.NewGuid().ToString()
-            });
-            await WriteFrameAsync(1, new
-            {
-                cmd   = "SUBSCRIBE",
-                evt   = "VOICE_STATE_UPDATE",
-                nonce = Guid.NewGuid().ToString()
-            });
-            await WriteFrameAsync(1, new
-            {
-                cmd   = "SUBSCRIBE",
-                evt   = "VOICE_STATE_DELETE",
-                nonce = Guid.NewGuid().ToString()
-            });
+                await WriteFrameAsync(1, new
+                {
+                    cmd   = "SUBSCRIBE",
+                    evt,
+                    nonce = Guid.NewGuid().ToString()
+                });
+            }
         }
 
-        // ── Read loop ─────────────────────────────────────────────────────────
         private async Task ReadLoopAsync(CancellationToken ct)
         {
             var header = new byte[8];
@@ -143,29 +186,82 @@ namespace LoLProximityChat.Core.Audio
         {
             try
             {
-                var doc  = JsonDocument.Parse(json);
-                var root = doc.RootElement;
+                var doc    = JsonDocument.Parse(json);
+                var root   = doc.RootElement;
 
                 if (!root.TryGetProperty("cmd", out var cmd)) return;
                 var cmdStr = cmd.GetString();
 
-                // READY — handshake ok, on subscribe aux events
+                // READY → demande autorisation
                 if (cmdStr == "DISPATCH" &&
                     root.TryGetProperty("evt", out var evt) &&
                     evt.GetString() == "READY")
                 {
-                    Console.WriteLine("[DISCORD RPC] Ready");
+                    Console.WriteLine("[DISCORD RPC] Ready → autorisation...");
+                    await AuthorizeAsync();
+                    return;
+                }
+
+                // AUTHORIZE → échange le code contre un token
+                if (cmdStr == "AUTHORIZE")
+                {
+                    if (root.TryGetProperty("evt", out var authEvt) &&
+                        authEvt.GetString() == "ERROR")
+                    {
+                        Console.WriteLine("[DISCORD RPC] Autorisation refusée par l'utilisateur");
+                        return;
+                    }
+
+                    var code = root
+                        .GetProperty("data")
+                        .GetProperty("code")
+                        .GetString();
+
+                    if (code is null) return;
+
+                    Console.WriteLine("[DISCORD RPC] Code reçu → échange token...");
+                    var token = await ExchangeCodeAsync(code);
+                    if (token is null) return;
+
+                    await AuthenticateAsync(token);
+                    return;
+                }
+
+                // AUTHENTICATE → authentifié, on peut tout faire
+                if (cmdStr == "AUTHENTICATE")
+                {
+                    if (root.TryGetProperty("evt", out var authEvt2) &&
+                        authEvt2.GetString() == "ERROR")
+                    {
+                        Console.WriteLine("[DISCORD RPC] Authentification échouée");
+                        return;
+                    }
+
+                    Console.WriteLine("[DISCORD RPC] Authentifié ✓");
+                    _authorized = true;
                     await SubscribeVoiceStateAsync();
                     await GetVoiceChannelAsync();
                     return;
                 }
 
-                // Réponse GET_SELECTED_VOICE_CHANNEL
+                if (!_authorized) return;
+
+                // GET_SELECTED_VOICE_CHANNEL
                 if (cmdStr == "GET_SELECTED_VOICE_CHANNEL")
                 {
-                    if (root.TryGetProperty("data", out var data) &&
-                        data.ValueKind != JsonValueKind.Null)
-                        ParseVoiceMembers(data);
+                    if (root.TryGetProperty("data", out var data))
+                    {
+                        if (data.ValueKind == JsonValueKind.Null)
+                        {
+                            Console.WriteLine("[DISCORD RPC] Pas dans un channel vocal");
+                            VoiceMembers = new();
+                            OnVoiceMembersChanged?.Invoke(VoiceMembers);
+                        }
+                        else
+                        {
+                            ParseVoiceMembers(data);
+                        }
+                    }
                     return;
                 }
 
@@ -205,7 +301,6 @@ namespace LoLProximityChat.Core.Audio
             Console.WriteLine($"[DISCORD RPC] {members.Count} membres : {string.Join(", ", members.Keys)}");
         }
 
-        // ── Write ─────────────────────────────────────────────────────────────
         private async Task WriteFrameAsync(int opcode, object payload)
         {
             if (_pipe == null || !_pipe.IsConnected) return;

@@ -10,7 +10,8 @@ namespace LoLProximityChat.WPF.ViewModels
         private readonly ProximityCalculator _proximity = new();
         private readonly AppConfig           _config    = AppConfig.Load();
         private readonly PositionTracker     _tracker   = new();
-        private readonly DiscordRpcService   _discord   = new("989513523359006800");
+        private readonly DiscordRpcService _discord = new("989513523359006800",
+            AppConfig.Load().ServerUrl);
         private readonly AudioViewModel      _audioVm;
 
         // Mapping LoL → Discord username reçu du serveur
