@@ -112,13 +112,13 @@
             (float x, float y) listener,
             (float x, float y) speaker)
         {
-            const float maxRange = 15000f;
+            const float maxRange = 3500f;
             var distance = MathF.Sqrt(
                 MathF.Pow(listener.x - speaker.x, 2) +
                 MathF.Pow(listener.y - speaker.y, 2));
             if (distance >= maxRange) return 0f;
             var volume = 1f - (distance / maxRange);
-            return MathF.Pow(volume, 2);
+            return MathF.Pow(volume, 2); // courbe quadratique douce
         }
     }
 }
