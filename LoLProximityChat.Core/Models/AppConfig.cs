@@ -8,7 +8,8 @@ namespace LoLProximityChat.Core.Models
         public int    MinimapY         { get; set; }
         public int    MinimapSize      { get; set; }
         public string ServerUrl        { get; set; } = "https://lol-proxchat-production.up.railway.app";
-        public string MyDiscordUsername { get; set; } = ""; // ex: "thomas_bsn"
+        public string MyDiscordUsername { get; set; } = "";
+        public string DiscordClientId { get; set; } = "989513523359006800";
 
         private static readonly string ConfigPath =
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),

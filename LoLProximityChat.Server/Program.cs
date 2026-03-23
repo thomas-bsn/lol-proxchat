@@ -16,14 +16,25 @@ app.MapHub<ProximityHub>("/proximity");
 // ── Endpoint OAuth Discord ─────────────────────────────────────────────────
 app.MapPost("/auth/discord/token", async (HttpContext ctx, IHttpClientFactory factory) =>
 {
-    var body = await System.Text.Json.JsonSerializer
-        .DeserializeAsync<TokenRequest>(ctx.Request.Body);
+    var bodyStr = await new StreamReader(ctx.Request.Body).ReadToEndAsync();
+    Console.WriteLine($"[DISCORD AUTH] Body reçu: {bodyStr}");
+    
+    var body = System.Text.Json.JsonSerializer.Deserialize<TokenRequest>(bodyStr,
+        new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
     if (body?.Code is null)
+    {
+        Console.WriteLine("[DISCORD AUTH] Code manquant");
         return Results.BadRequest("code manquant");
+    }
+    
+    Console.WriteLine($"[DISCORD AUTH] Code: {body.Code}");
 
-    var clientId     = Environment.GetEnvironmentVariable("DISCORD_CLIENT_ID")!;
-    var clientSecret = Environment.GetEnvironmentVariable("DISCORD_CLIENT_SECRET")!;
+    var clientId     = Environment.GetEnvironmentVariable("DISCORD_CLIENT_ID")
+                       ?? builder.Configuration["Discord:ClientId"]!;
+    var clientSecret = Environment.GetEnvironmentVariable("DISCORD_CLIENT_SECRET")
+                       ?? builder.Configuration["Discord:ClientSecret"]!;
     var redirectUri  = Environment.GetEnvironmentVariable("DISCORD_REDIRECT_URI")
+                       ?? builder.Configuration["Discord:RedirectUri"]
                        ?? "http://localhost";
 
     var http = factory.CreateClient();
@@ -52,6 +63,7 @@ app.MapPost("/auth/discord/token", async (HttpContext ctx, IHttpClientFactory fa
     Console.WriteLine("[DISCORD AUTH] Token obtenu avec succès");
     return Results.Ok(new { access_token = accessToken });
 });
+
 
 app.Run();
 

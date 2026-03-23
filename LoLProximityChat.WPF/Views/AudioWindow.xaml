@@ -250,17 +250,8 @@
                                             </Style>
                                         </TextBlock.Style>
                                     </TextBlock>
-
-                                    <TextBlock FontSize="11" Foreground="#888">
-                                        <Run Text="{Binding VolumePercent, Mode=OneWay}"/>
-                                        <Run Text="%"/>
-                                    </TextBlock>
+                                    
                                 </StackPanel>
-
-                                <Button Grid.Column="1" Content="{Binding MuteIcon}"
-                                        Background="Transparent" BorderThickness="0"
-                                        FontSize="16" Cursor="Hand"
-                                        Click="OnMutePlayer"/>
                             </Grid>
                         </Border>
                     </DataTemplate>
