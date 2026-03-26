@@ -45,6 +45,7 @@ namespace LoLProximityChat.Server.Controllers
 
             var ws = await context.WebSockets.AcceptWebSocketAsync();
             _wsManager.Add(token, ws);
+            _roomService.ActivatePlayer(token, playerName, gameId);
 
             _logger.LogInformation("[WS] {Player} connecté à la room {GameId}", playerName, gameId);
 

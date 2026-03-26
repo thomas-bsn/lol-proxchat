@@ -9,7 +9,7 @@ var playerId   = "Joueur2";
 
 // 1. Rejoindre la room via HTTP
 using var http = new HttpClient { BaseAddress = new Uri(serverUrl) };
-var joinResponse = await http.PostAsJsonAsync("/room/join", new { roomId, playerId });
+var joinResponse = await http.PostAsJsonAsync("/room/join", new { roomId, playerId, discordUsername = playerId });
 joinResponse.EnsureSuccessStatusCode();
 
 var body  = await joinResponse.Content.ReadFromJsonAsync<JoinRoomResponse>();

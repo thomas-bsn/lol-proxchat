@@ -4,6 +4,8 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Shapes;
+using System.Windows.Threading;
+using LoLProximityChat.Core;
 using LoLProximityChat.Core.Models;
 using LoLProximityChat.WPF.ViewModels;
 using Color       = System.Windows.Media.Color;
@@ -18,6 +20,9 @@ namespace LoLProximityChat.WPF.Views
     {
         private MainViewModel _vm = null!;
         private bool _settingsOpen = false;
+
+        private DispatcherTimer? _pendingTimer;
+        private bool _blinkState = false;
 
         public MainWindow()
         {
@@ -44,9 +49,79 @@ namespace LoLProximityChat.WPF.Views
         public void Initialize(AppConfig config)
         {
             _vm = new MainViewModel(config);
+            _vm.Orchestrator.OnStateChanged += OnStateChanged;
+
             DiscordUsernameText.Text = config.DiscordUsername;
         }
-        
+
+        // ======================
+        // STATUS LOGIC
+        // ======================
+
+        private void OnStateChanged(OrchestratorState state)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                StopPendingAnimation();
+
+                switch (state)
+                {
+                    case OrchestratorState.Idle:
+                        SetStatus(Color.FromRgb(255, 100, 100), "OFF");
+                        break;
+
+                    case OrchestratorState.Disconnected:
+                        StartPendingAnimation();
+                        StatusText.Text = "PENDING";
+                        break;
+
+                    case OrchestratorState.InGame:
+                        SetStatus(Color.FromRgb(93, 202, 165), "CONNECTED");
+                        break;
+                }
+            });
+        }
+
+        private void SetStatus(Color color, string text)
+        {
+            StatusDot.Fill = new SolidColorBrush(color);
+            StatusText.Text = text;
+        }
+
+        private void StartPendingAnimation()
+        {
+            _pendingTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(500)
+            };
+
+            _pendingTimer.Tick += (_, _) =>
+            {
+                _blinkState = !_blinkState;
+
+                StatusDot.Fill = new SolidColorBrush(
+                    _blinkState
+                        ? Color.FromRgb(255, 180, 0)
+                        : Color.FromRgb(60, 60, 60)
+                );
+            };
+
+            _pendingTimer.Start();
+        }
+
+        private void StopPendingAnimation()
+        {
+            if (_pendingTimer != null)
+            {
+                _pendingTimer.Stop();
+                _pendingTimer = null;
+            }
+        }
+
+        // ======================
+        // UI EVENTS
+        // ======================
+
         private void OnQuitClick(object sender, MouseButtonEventArgs e)
         {
             System.Windows.Application.Current.Shutdown();
@@ -70,6 +145,10 @@ namespace LoLProximityChat.WPF.Views
             if (VolumeLabel != null)
                 VolumeLabel.Text = $"{(int)e.NewValue}%";
         }
+
+        // ======================
+        // PLAYERS
+        // ======================
 
         public void UpdatePlayers(List<PlayerViewModel> players, string roomId, string channelName)
         {
@@ -105,12 +184,10 @@ namespace LoLProximityChat.WPF.Views
                 {
                     var ring = new Ellipse
                     {
-                        Width               = 32,
-                        Height              = 32,
-                        Stroke              = new SolidColorBrush(Color.FromRgb(93, 202, 165)),
-                        StrokeThickness     = 1.5,
-                        HorizontalAlignment = HorizontalAlignment.Center,
-                        VerticalAlignment   = VerticalAlignment.Center
+                        Width = 32,
+                        Height = 32,
+                        Stroke = new SolidColorBrush(Color.FromRgb(93, 202, 165)),
+                        StrokeThickness = 1.5
                     };
 
                     var scaleTransform = new ScaleTransform(1, 1, 16, 16);
@@ -119,14 +196,13 @@ namespace LoLProximityChat.WPF.Views
                     var scaleAnim = new DoubleAnimation(1, 1.8, TimeSpan.FromSeconds(1.4))
                     {
                         RepeatBehavior = RepeatBehavior.Forever,
-                        BeginTime      = TimeSpan.FromSeconds(i * 0.7),
-                        EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                        BeginTime = TimeSpan.FromSeconds(i * 0.7)
                     };
 
                     var opacityAnim = new DoubleAnimation(1, 0, TimeSpan.FromSeconds(1.4))
                     {
                         RepeatBehavior = RepeatBehavior.Forever,
-                        BeginTime      = TimeSpan.FromSeconds(i * 0.7)
+                        BeginTime = TimeSpan.FromSeconds(i * 0.7)
                     };
 
                     scaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, scaleAnim);
@@ -139,68 +215,25 @@ namespace LoLProximityChat.WPF.Views
 
             var avatarBorder = new Border
             {
-                Width           = 32,
-                Height          = 32,
-                CornerRadius    = new CornerRadius(16),
-                Background      = new SolidColorBrush(Color.FromArgb(255, 42, 42, 53)),
+                Width = 32,
+                Height = 32,
+                CornerRadius = new CornerRadius(16),
+                Background = new SolidColorBrush(Color.FromArgb(255, 42, 42, 53)),
                 BorderThickness = new Thickness(player.IsLocal ? 1.5 : 0),
-                BorderBrush     = player.IsLocal
+                BorderBrush = player.IsLocal
                     ? new SolidColorBrush(Color.FromRgb(93, 202, 165))
                     : Brushes.Transparent
             };
 
             avatarBorder.Child = new TextBlock
             {
-                Text                = player.Initial.ToString(),
-                FontSize            = 12,
-                FontWeight          = FontWeights.Medium,
-                Foreground          = player.IsLocal
-                    ? new SolidColorBrush(Color.FromRgb(93, 202, 165))
-                    : new SolidColorBrush(Color.FromArgb(153, 255, 255, 255)),
+                Text = player.Initial.ToString(),
                 HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment   = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center
             };
 
             avatarGrid.Children.Add(avatarBorder);
             grid.Children.Add(avatarGrid);
-
-            var infoPanel = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-            Grid.SetColumn(infoPanel, 1);
-
-            var namePanel = new StackPanel { Orientation = Orientation.Horizontal };
-
-            namePanel.Children.Add(new TextBlock
-            {
-                Text       = player.Name,
-                FontSize   = 13,
-                FontWeight = FontWeights.Medium,
-                Foreground = new SolidColorBrush(Color.FromArgb(230, 255, 255, 255)),
-                Margin     = new Thickness(0, 0, 6, 0)
-            });
-
-            if (player.IsLocal)
-                namePanel.Children.Add(new TextBlock
-                {
-                    Text              = "(toi)",
-                    FontSize          = 10,
-                    Foreground        = new SolidColorBrush(Color.FromArgb(76, 255, 255, 255)),
-                    VerticalAlignment = VerticalAlignment.Center
-                });
-
-            infoPanel.Children.Add(namePanel);
-
-            if (!string.IsNullOrEmpty(player.Role))
-                infoPanel.Children.Add(new TextBlock
-                {
-                    Text       = player.Role,
-                    FontSize   = 11,
-                    Foreground = new SolidColorBrush(Color.FromArgb(76, 255, 255, 255))
-                });
-
-            grid.Children.Add(infoPanel);
-
-            if (player.IsOutOfRange)
-                grid.Opacity = 0.35;
 
             return grid;
         }

@@ -56,7 +56,25 @@ namespace LoLProximityChat.Services.Discord
 
             await HandshakeAsync();
             _ = ReadLoopAsync(_cts.Token);
-            return true;           // ← succès
+
+            var success = await WaitForAuthorizationAsync(ct);
+            return success;
+        }
+        
+        private async Task<bool> WaitForAuthorizationAsync(CancellationToken ct)
+        {
+            var timeout = TimeSpan.FromSeconds(30);
+            var start   = DateTime.UtcNow;
+
+            while (!_authorized && !ct.IsCancellationRequested)
+            {
+                if (DateTime.UtcNow - start > timeout)
+                    return false;
+
+                await Task.Delay(200, ct);
+            }
+
+            return _authorized;
         }
 
         private async Task HandshakeAsync()

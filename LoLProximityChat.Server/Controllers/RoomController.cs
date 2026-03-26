@@ -20,16 +20,22 @@ namespace LoLProximityChat.Server.Controllers
         [HttpPost("join")]
         public IActionResult Join([FromBody] JoinRoomRequest request)
         {
-            if (string.IsNullOrWhiteSpace(request.RoomId)    ||
-                string.IsNullOrWhiteSpace(request.PlayerId)  ||
-                string.IsNullOrWhiteSpace(request.DiscordUsername))
-                return BadRequest("RoomId, PlayerId et DiscordUsername sont requis");
+            if (string.IsNullOrWhiteSpace(request.RoomId) ||
+                string.IsNullOrWhiteSpace(request.PlayerId))
+                return BadRequest("RoomId et PlayerId sont requis");
+
+            var discordUsername = string.IsNullOrWhiteSpace(request.DiscordUsername)
+                ? request.PlayerId
+                : request.DiscordUsername;
 
             var connectionId = Guid.NewGuid().ToString();
-            _roomService.AddPlayer(connectionId, request.PlayerId, request.RoomId, request.DiscordUsername);
 
-            _logger.LogInformation("[RoomController] {Player} ({Discord}) → room {RoomId}",
-                request.PlayerId, request.DiscordUsername, request.RoomId);
+            _roomService.AddPlayer(
+                connectionId,
+                request.PlayerId,
+                request.RoomId,
+                discordUsername
+            );
 
             return Ok(new JoinRoomResponse(connectionId));
         }

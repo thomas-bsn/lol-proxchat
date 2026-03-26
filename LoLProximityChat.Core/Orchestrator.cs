@@ -8,6 +8,7 @@ using LoLProximityChat.Shared.DTOs;
 namespace LoLProximityChat.Core
 {
     public enum OrchestratorState { Idle, InGame, Disconnected }
+    
 
     public class Orchestrator
     {
@@ -17,6 +18,9 @@ namespace LoLProximityChat.Core
         private readonly IDiscordRpcService _discordRpcService;
 
         private OrchestratorState _state = OrchestratorState.Idle;
+        public OrchestratorState State => _state;
+        public event Action<OrchestratorState>? OnStateChanged;
+
         private PlayerPosition?   _lastSentPosition;
 
         public Orchestrator(
@@ -35,19 +39,57 @@ namespace LoLProximityChat.Core
         }
 
         // --- Démarrage ---
+        
+        private void SetState(OrchestratorState newState)
+        {
+            if (_state == newState) return;
+
+            _state = newState;
+            OnStateChanged?.Invoke(_state);
+        }
 
         public async Task<bool> JoinAndConnectAsync(string roomId, string playerId, CancellationToken ct)
         {
             if (_state != OrchestratorState.Idle) return false;
 
-            var discordConnected = await _discordRpcService.ConnectAsync(ct);
-            if (!discordConnected) return false;
+            SetState(OrchestratorState.Disconnected); // → PENDING
 
-            var token = await _roomService.JoinOrCreateAsync(roomId, playerId, ct);
-            await _socketService.ConnectAsync(token, ct);
+            var token = await WaitForServerAsync(roomId, playerId, ct);
+            if (token is null) return false;
 
-            _state = OrchestratorState.InGame;
-            return true;
+            var discordOk = await _discordRpcService.ConnectAsync(ct);
+            if (!discordOk)
+            {
+                SetState(OrchestratorState.Idle);
+                return false;
+            }
+
+            try
+            {
+                await _socketService.ConnectAsync(token, ct);
+                SetState(OrchestratorState.InGame);
+                return true;
+            }
+            catch
+            {
+                SetState(OrchestratorState.Disconnected);
+                return false;
+            }
+        }
+        
+        private async Task<string?> WaitForServerAsync(string roomId, string playerId, CancellationToken ct)
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                var token = await _roomService.JoinOrCreateAsync(roomId, playerId, ct);
+
+                if (token != null)
+                    return token;
+
+                await Task.Delay(2000, ct);
+            }
+
+            return null;
         }
 
         // --- Envoi position ---
@@ -85,14 +127,14 @@ namespace LoLProximityChat.Core
 
         private async Task OnDisconnectedAsync()
         {
-            _state = OrchestratorState.Disconnected;
+            SetState(OrchestratorState.Disconnected);
 
             var reconnected = await _reconnectionPolicy.TryReconnectAsync(
                 () => _socketService.ReconnectAsync(CancellationToken.None),
                 CancellationToken.None
             );
 
-            _state = reconnected ? OrchestratorState.InGame : OrchestratorState.Idle;
+            SetState(reconnected ? OrchestratorState.InGame : OrchestratorState.Idle);
         }
 
         // --- Arrêt ---
@@ -102,7 +144,7 @@ namespace LoLProximityChat.Core
             await _discordRpcService.ResetAsync();
             await _socketService.DisconnectAsync();
 
-            _state            = OrchestratorState.Idle;
+            SetState(OrchestratorState.Idle);
             _lastSentPosition = null;
         }
     }

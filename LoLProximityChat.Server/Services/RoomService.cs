@@ -31,9 +31,24 @@ namespace LoLProximityChat.Server.Services
                 _playerToConnection[playerName]   = connectionId;
                 _connectionToGame[connectionId]   = gameId;
                 _playerToDiscord[playerName]      = discordUsername;
-                _rooms[gameId][playerName]        = (0f, 0f);
 
-                _logger.LogInformation("[Room] {Player} ({Discord}) a rejoint {GameId}", playerName, discordUsername, gameId);
+                _logger.LogInformation("[Room] {Player} pending join {GameId}", playerName, gameId);
+            }
+        }
+        
+        public void ActivatePlayer(string connectionId, string playerName, string gameId)
+        {
+            lock (_lock)
+            {
+                if (!_rooms.ContainsKey(gameId))
+                {
+                    _rooms[gameId] = new();
+                    _logger.LogInformation("[Room] Room {GameId} créée", gameId);
+                }
+
+                _rooms[gameId][playerName] = (0f, 0f);
+
+                _logger.LogInformation("[Room] {Player} ACTIF dans {GameId}", playerName, gameId);
             }
         }
 

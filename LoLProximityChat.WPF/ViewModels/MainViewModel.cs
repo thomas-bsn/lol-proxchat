@@ -10,6 +10,7 @@ namespace LoLProximityChat.WPF.ViewModels
     public class MainViewModel
     {
         private readonly Orchestrator _orchestrator;
+        public Orchestrator Orchestrator => _orchestrator;
 
         public MainViewModel(AppConfig config)
         {
@@ -39,11 +40,6 @@ namespace LoLProximityChat.WPF.ViewModels
             );
             
             await Task.Delay(500);
-            
-            if (!connected)
-                throw new Exception("Discord n'est pas ouvert. Lance Discord et réessaie.");
-
-            
 
             while (true)
             {

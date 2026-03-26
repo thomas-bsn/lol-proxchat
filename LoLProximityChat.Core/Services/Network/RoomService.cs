@@ -19,18 +19,26 @@ namespace LoLProximityChat.Core.Services.Network
             };
         }
 
-        public async Task<string> JoinOrCreateAsync(string roomId, string playerId, CancellationToken ct)
+        public async Task<string?> JoinOrCreateAsync(string roomId, string playerId, CancellationToken ct)
         {
-            var response = await _http.PostAsJsonAsync("/room/join", new JoinRoomRequest(
-                roomId,
-                playerId,
-                _config.DiscordUsername
-            ), ct);
+            try
+            {
+                var response = await _http.PostAsJsonAsync("/room/join", new JoinRoomRequest(
+                    roomId,
+                    playerId,
+                    _config.DiscordUsername
+                ), ct);
 
-            response.EnsureSuccessStatusCode();
+                if (!response.IsSuccessStatusCode)
+                    return null;
 
-            var result = await response.Content.ReadFromJsonAsync<JoinRoomResponse>(cancellationToken: ct);
-            return result?.Token ?? throw new Exception("Token manquant dans la réponse du serveur");
+                var result = await response.Content.ReadFromJsonAsync<JoinRoomResponse>(cancellationToken: ct);
+                return result?.Token;
+            }
+            catch
+            {
+                return null;
+            }
         }
     }
 }
