@@ -1,10 +1,12 @@
 ﻿using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
+using LoLProximityChat.Core.Interfaces;
+using LoLProximityChat.Shared.DTOs;
 
-namespace LoLProximityChat.Core.Audio
+namespace LoLProximityChat.Services.Discord
 {
-    public class DiscordRpcService : IDisposable
+    public class DiscordRpcService : IDiscordRpcService, IDisposable
     {
         public Dictionary<string, string> VoiceMembers { get; private set; } = new();
         public event Action<Dictionary<string, string>>? OnVoiceMembersChanged;
@@ -16,16 +18,18 @@ namespace LoLProximityChat.Core.Audio
         private readonly SemaphoreSlim _writeLock = new(1, 1);
         private bool _authorized = false;
         private string? _currentChannelId = null;
+        private readonly string _redirectUri;
 
-        public DiscordRpcService(string clientId, string serverUrl)
+        public DiscordRpcService(string clientId, string serverUrl, string redirectUri)
         {
             _clientId  = clientId;
             _serverUrl = serverUrl;
+            _redirectUri = redirectUri;
         }
 
-        public async Task ConnectAsync()
+        public async Task<bool> ConnectAsync(CancellationToken ct = default)
         {
-            _cts = new CancellationTokenSource();
+            _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
 
             for (int i = 0; i <= 9; i++)
             {
@@ -47,11 +51,12 @@ namespace LoLProximityChat.Core.Audio
             if (_pipe == null)
             {
                 Console.WriteLine("[DISCORD RPC] Discord non trouvé");
-                return;
+                return false;      // ← échec
             }
 
             await HandshakeAsync();
             _ = ReadLoopAsync(_cts.Token);
+            return true;           // ← succès
         }
 
         private async Task HandshakeAsync()
@@ -61,7 +66,11 @@ namespace LoLProximityChat.Core.Audio
             => await WriteFrameAsync(1, new
             {
                 cmd  = "AUTHORIZE",
-                args = new { client_id = _clientId, scopes = new[] { "rpc", "rpc.voice.read" } },
+                args = new { 
+                    client_id = _clientId, 
+                    scopes = new[] { "rpc", "rpc.voice.read" }
+                    
+                },
                 nonce = Guid.NewGuid().ToString()
             });
 
@@ -82,6 +91,36 @@ namespace LoLProximityChat.Core.Audio
                 args  = new { },
                 nonce = Guid.NewGuid().ToString()
             });
+        }
+        
+        public async Task ResetAsync()
+        {
+            if (!_authorized) return;
+
+            foreach (var (_, userId) in VoiceMembers)
+                await SetUserVolumeAsync(userId, 1f);
+
+            Console.WriteLine("[DISCORD RPC] Volumes réinitialisés");
+        }
+        
+        public async Task ApplyVolumesAsync(VolumePayload payload)
+        {
+            if (!_authorized) return;
+
+            foreach (var (_, playerVolume) in payload.Volumes)
+            {
+                var discordUsername = playerVolume.DiscordUsername;
+                var volume          = playerVolume.Volume;
+
+                // Cherche le userId Discord à partir du username
+                if (!VoiceMembers.TryGetValue(discordUsername, out var userId))
+                {
+                    Console.WriteLine($"[DISCORD RPC] {discordUsername} pas trouvé dans VoiceMembers");
+                    continue;
+                }
+
+                await SetUserVolumeAsync(userId, volume);
+            }
         }
 
         // Subscribe aux events d'un channel spécifique

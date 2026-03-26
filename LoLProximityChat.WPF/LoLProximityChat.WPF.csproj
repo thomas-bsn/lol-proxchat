@@ -6,13 +6,13 @@
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <RootNamespace>LoLProximityChat.WPF</RootNamespace>
-        <ApplicationIcon>Views\Assets\icon.ico</ApplicationIcon>
         <UseWindowsForms>true</UseWindowsForms>
         <EnableWindowsTargeting>true</EnableWindowsTargeting>
     </PropertyGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\LoLProximityChat.Core\LoLProximityChat.Core.csproj"/>
+        <ProjectReference Include="..\LoLProximityChat.Shared\LoLProximityChat.Shared.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
@@ -20,9 +20,9 @@
             <DependentUpon>App.xaml.cs</DependentUpon>
         </Page>
         <Page Update="Views\MainWindow.xaml">
-          <Generator>MSBuild:Compile</Generator>
-          <XamlRuntime>Wpf</XamlRuntime>
-          <SubType>Designer</SubType>
+            <Generator>MSBuild:Compile</Generator>
+            <XamlRuntime>Wpf</XamlRuntime>
+            <SubType>Designer</SubType>
         </Page>
     </ItemGroup>
 
@@ -33,18 +33,5 @@
         <Compile Update="App.xaml.cs">
             <DependentUpon>App.xaml</DependentUpon>
         </Compile>
-    </ItemGroup>
-
-    <ItemGroup>
-      <Resource Include="Views\Assets\icon.ico" />
-    </ItemGroup>
-
-    <ItemGroup>
-        <Content Include="Core\Models\champion_classifier.onnx">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </Content>
-        <Content Include="Core\Models\champion_labels.json">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </Content>
     </ItemGroup>
 </Project>

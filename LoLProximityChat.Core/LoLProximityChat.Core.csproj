@@ -24,4 +24,12 @@
       <None Remove="Models\champion_labels.json" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="Assets\" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\LoLProximityChat.Shared\LoLProximityChat.Shared.csproj" />
+    </ItemGroup>
+
 </Project>

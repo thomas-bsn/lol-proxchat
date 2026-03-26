@@ -2,28 +2,29 @@
 
 namespace LoLProximityChat.Core.Models
 {
-    public class ActivePlayer
+    public class GameState
     {
-        [JsonPropertyName("summonerName")]
-        public string SummonerName { get; set; } = "";
+        public bool   IsInGame        { get; set; }
+        public string LocalPlayerName { get; set; } = "";
+        public float  GameTime        { get; set; }
+        public List<PlayerPosition> Players { get; set; } = [];
+
+        public List<PlayerPosition> OrderTeam   => Players.Where(p => p.Team == "ORDER").ToList();
+        public List<PlayerPosition> ChaosTeam   => Players.Where(p => p.Team == "CHAOS").ToList();
+        public PlayerPosition?      LocalPlayer => Players.FirstOrDefault(p => p.IsLocalPlayer);
     }
 
-    // NOUVEAU — mappe /liveclientdata/gamestats
-    public class GameStats
+    // Modèle interne pour désérialiser /liveclientdata/gamestats
+    internal class GameStats
     {
         [JsonPropertyName("gameTime")]
         public float GameTime { get; set; }
     }
 
-    public class GameState
+    // Modèle interne pour désérialiser /liveclientdata/activeplayer
+    internal class ActivePlayer
     {
-        public bool   IsInGame         { get; set; }
-        public string LocalPlayerName  { get; set; } = "";
-        public List<PlayerInfo> Players { get; set; } = [];
-        public float  GameTime         { get; set; } // NOUVEAU
-
-        public List<PlayerInfo> OrderTeam => Players.Where(p => p.Team == "ORDER").ToList();
-        public List<PlayerInfo> ChaosTeam => Players.Where(p => p.Team == "CHAOS").ToList();
-        public PlayerInfo? LocalPlayer   => Players.FirstOrDefault(p => p.IsLocalPlayer);
+        [JsonPropertyName("summonerName")]
+        public string SummonerName { get; set; } = "";
     }
 }

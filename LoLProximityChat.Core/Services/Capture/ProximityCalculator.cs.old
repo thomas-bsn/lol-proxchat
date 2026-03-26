@@ -6,11 +6,11 @@ namespace LoLProximityChat.Core.Services
     {
         private readonly Dictionary<string, (float x, float y)> _lastPositions = new();
 
-        public List<PlayerMapPosition> MapBlobsToPlayers(
+        public List<VolumeMapping> MapBlobsToPlayers(
             List<(float x, float y, string team)> blobs,
-            List<PlayerInfo> players)
+            List<PlayerPosition> players)
         {
-            var result = new List<PlayerMapPosition>();
+            var result = new List<VolumeMapping>();
 
             var orderPlayers = players.Where(p => p.Team == "ORDER").ToList();
             var chaosPlayers = players.Where(p => p.Team == "CHAOS").ToList();
@@ -29,8 +29,8 @@ namespace LoLProximityChat.Core.Services
 
         private static void AssignBlobsToPlayers(
             List<(float x, float y, string team)> blobs,
-            List<PlayerInfo> players,
-            List<PlayerMapPosition> result,
+            List<PlayerPosition> players,
+            List<VolumeMapping> result,
             Dictionary<string, (float x, float y)> lastPositions)
         {
             var usedBlobs = new HashSet<int>();
@@ -57,7 +57,7 @@ namespace LoLProximityChat.Core.Services
                 {
                     usedBlobs.Add(bestIdx);
                     assigned.Add(player.SummonerName);
-                    result.Add(new PlayerMapPosition
+                    result.Add(new VolumeMapping
                     {
                         SummonerName = player.SummonerName,
                         ChampionName = player.ChampionName,
@@ -71,7 +71,7 @@ namespace LoLProximityChat.Core.Services
 
             // Joueurs non assignés = fog of war
             foreach (var player in players.Where(p => !assigned.Contains(p.SummonerName)))
-                result.Add(new PlayerMapPosition
+                result.Add(new VolumeMapping
                 {
                     SummonerName = player.SummonerName,
                     ChampionName = player.ChampionName,

@@ -1,11 +1,11 @@
 ﻿using System.Text.Json;
 using LoLProximityChat.Core.Models;
 
-namespace LoLProximityChat.Core.Services
+namespace LoLProximityChat.Core.Services.Network
 {
-    public class LiveApiPoller : IDisposable
+    public class LiveApiPoller : ILiveApiPoller, IDisposable
     {
-        private const string BaseUrl      = "https://127.0.0.1:2999";
+        private const string BaseUrl        = "https://127.0.0.1:2999";
         private const int    PollIntervalMs = 1000;
 
         private static readonly HttpClient _http = new(new HttpClientHandler
@@ -21,7 +21,7 @@ namespace LoLProximityChat.Core.Services
         private bool _wasInGame;
 
         public event Action<GameState>? OnStateChanged;
-        public event Action?            OnGameStarted;
+        public event Action<GameState>? OnGameStarted;
         public event Action?            OnGameEnded;
 
         public void Start()
@@ -61,7 +61,7 @@ namespace LoLProximityChat.Core.Services
             if (state.IsInGame && !_wasInGame)
             {
                 _wasInGame = true;
-                OnGameStarted?.Invoke();
+                OnGameStarted?.Invoke(state);
             }
             else if (!state.IsInGame && _wasInGame)
             {
@@ -77,12 +77,11 @@ namespace LoLProximityChat.Core.Services
             var localName  = active?.SummonerName ?? "";
 
             var listJson = await _http.GetStringAsync("/liveclientdata/playerlist");
-            var players  = JsonSerializer.Deserialize<List<PlayerInfo>>(listJson) ?? [];
+            var rawPlayers = JsonSerializer.Deserialize<List<PlayerPosition>>(listJson) ?? [];
 
-            foreach (var p in players)
+            foreach (var p in rawPlayers)
                 p.IsLocalPlayer = p.SummonerName == localName;
 
-            // NOUVEAU — récupère le temps de jeu
             var statsJson = await _http.GetStringAsync("/liveclientdata/gamestats");
             var stats     = JsonSerializer.Deserialize<GameStats>(statsJson);
 
@@ -90,8 +89,8 @@ namespace LoLProximityChat.Core.Services
             {
                 IsInGame        = true,
                 LocalPlayerName = localName,
-                Players         = players,
-                GameTime        = stats?.GameTime ?? 0f  // NOUVEAU
+                Players         = rawPlayers,
+                GameTime        = stats?.GameTime ?? 0f
             };
         }
 

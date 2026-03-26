@@ -8,6 +8,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoLProximityChat.Server", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoLProximityChat.FakePlayer", "LoLProximityChat.FakePlayer\LoLProximityChat.FakePlayer.csproj", "{C9DD266D-7F40-457C-8BF0-E86069B6C304}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoLProximityChat.Shared", "LoLProximityChat.Shared\LoLProximityChat.Shared.csproj", "{FA6E0351-1F7D-4F42-B0EE-FCB2BF95E2F1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,5 +32,9 @@ Global
 		{C9DD266D-7F40-457C-8BF0-E86069B6C304}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C9DD266D-7F40-457C-8BF0-E86069B6C304}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C9DD266D-7F40-457C-8BF0-E86069B6C304}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FA6E0351-1F7D-4F42-B0EE-FCB2BF95E2F1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FA6E0351-1F7D-4F42-B0EE-FCB2BF95E2F1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FA6E0351-1F7D-4F42-B0EE-FCB2BF95E2F1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FA6E0351-1F7D-4F42-B0EE-FCB2BF95E2F1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

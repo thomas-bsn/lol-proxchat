@@ -1,115 +1,60 @@
-﻿using System.ComponentModel;
-using System.Runtime.CompilerServices;
+﻿using LoLProximityChat.Core;
 using LoLProximityChat.Core.Models;
-using LoLProximityChat.Core.Services;
+using LoLProximityChat.Core.Services.Network;
+using LoLProximityChat.Core.Core;
+using LoLProximityChat.Services.Discord;
+using LoLProximityChat.Shared.Constants;
 
 namespace LoLProximityChat.WPF.ViewModels
 {
-    public class MainViewModel : INotifyPropertyChanged, IAsyncDisposable
+    public class MainViewModel
     {
-        private readonly LiveApiPoller _poller  = new();
-        private readonly SignalRClient _signalR = new(AppConfig.Load().ServerUrl);
+        private readonly Orchestrator _orchestrator;
 
-        public AudioViewModel       Audio      { get; } = new();
-        public PlayerListViewModel  PlayerList { get; } = new();
-        public GameSessionViewModel Session    { get; private set; } = null!;
-
-        // NOUVEAU — exposé pour AudioWindow
-        public string LocalPlayerName => Session?.LocalPlayerName ?? "";
-
-        public float MasterVolume
+        public MainViewModel(AppConfig config)
         {
-            get => Audio.MasterVolume;
-            set => Audio.MasterVolume = value;
-        }
-        public int MasterVolumePercent => Audio.MasterVolumePercent;
+            var roomService        = new RoomService(config);
+            var socketService      = new SocketService(config);
+            var reconnectionPolicy = new ReconnectionPolicy();
+            var discordRpcService  = new DiscordRpcService(
+                config.DiscordClientId,
+                config.ServerUrl,
+                config.DiscordRedirectUri
+            );
 
-        private bool _isReconnecting;
-        public bool IsReconnecting
-        {
-            get => _isReconnecting;
-            set { _isReconnecting = value; OnPropertyChanged(); OnPropertyChanged(nameof(ReconnectText)); }
-        }
-        public string ReconnectText => _isReconnecting ? "Connexion..." : "↺ Reconnecter";
-
-        public async void Reconnect()
-        {
-            if (IsReconnecting) return;
-            IsReconnecting = true;
-            await Session.ReconnectAsync();
-            IsReconnecting = false;
+            _orchestrator = new Orchestrator(
+                roomService,
+                socketService,
+                reconnectionPolicy,
+                discordRpcService
+            );
         }
 
-        private bool _isInGame;
-        public bool IsInGame
+        public async Task JoinTestRoomAsync()
         {
-            get => _isInGame;
-            set { _isInGame = value; OnPropertyChanged(); }
-        }
+            var connected = await _orchestrator.JoinAndConnectAsync(
+                roomId:   "testroom123",
+                playerId: "Joueur1",
+                ct:       CancellationToken.None
+            );
+            
+            await Task.Delay(500);
+            
+            if (!connected)
+                throw new Exception("Discord n'est pas ouvert. Lance Discord et réessaie.");
 
-        private bool _isServerConnected;
-        public bool IsServerConnected
-        {
-            get => _isServerConnected;
-            set { _isServerConnected = value; OnPropertyChanged(); OnPropertyChanged(nameof(ServerStatusText)); }
-        }
-        public string ServerStatusText => _isServerConnected ? "Serveur connecté" : "Serveur déconnecté";
+            
 
-        private string _statusText = "En attente d'une game...";
-        public string StatusText
-        {
-            get => _statusText;
-            set { _statusText = value; OnPropertyChanged(); }
-        }
-
-        public MainViewModel()
-        {
-            Session = new GameSessionViewModel(_signalR, Audio);
-
-            Session.OnServerConnectionChanged += connected =>
-                App.Current.Dispatcher.Invoke(() => IsServerConnected = connected);
-
-            Audio.MasterVolumeChanged += _ =>
+            while (true)
             {
-                OnPropertyChanged(nameof(MasterVolume));
-                OnPropertyChanged(nameof(MasterVolumePercent));
-            };
-
-            _poller.OnGameStarted  += () => App.Current.Dispatcher.Invoke(OnGameStarted);
-            _poller.OnGameEnded    += () => App.Current.Dispatcher.Invoke(OnGameEnded);
-            _poller.OnStateChanged += s  => App.Current.Dispatcher.Invoke(() => OnStateChanged(s));
-            _poller.Start();
-        }
-
-        private void OnGameStarted()
-        {
-            IsInGame   = true;
-            StatusText = "Game en cours";
-        }
-
-        private async void OnGameEnded()
-        {
-            IsInGame   = false;
-            StatusText = "En attente d'une game...";
-            await Session.OnGameEndedAsync();
-            PlayerList.Clear();
-        }
-
-        private async void OnStateChanged(GameState state)
-        {
-            if (!state.IsInGame) return;
-            await Session.OnStateAsync(state);
-            PlayerList.Update(state);
-        }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-        private void OnPropertyChanged([CallerMemberName] string? name = null)
-            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-
-        public async ValueTask DisposeAsync()
-        {
-            _poller.Dispose();
-            await Session.DisposeAsync();
+                await _orchestrator.SendPositionAsync(new PlayerPosition
+                {
+                    SummonerName = "Joueur1",
+                    X            = 7000f,
+                    Y            = 7000f
+                });
+                await Task.Delay(1000);
+            }
         }
     }
 }

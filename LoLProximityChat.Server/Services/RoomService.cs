@@ -1,25 +1,39 @@
-﻿namespace LoLProximityChat.Server.Services
+﻿using Microsoft.Extensions.Logging;
+
+namespace LoLProximityChat.Server.Services
 {
     public class RoomService
     {
-        private readonly Dictionary<string, Dictionary<string, (float x, float y)>> _rooms          = new();
-        private readonly Dictionary<string, string> _connectionToPlayer   = new();
-        private readonly Dictionary<string, string> _playerToConnection   = new();
-        private readonly Dictionary<string, string> _connectionToGame     = new();
-        private readonly Dictionary<string, string> _playerToDiscord      = new(); // NOUVEAU
+        private readonly Dictionary<string, Dictionary<string, (float x, float y)>> _rooms        = new();
+        private readonly Dictionary<string, string> _connectionToPlayer  = new();
+        private readonly Dictionary<string, string> _playerToConnection  = new();
+        private readonly Dictionary<string, string> _connectionToGame    = new();
+        private readonly Dictionary<string, string> _playerToDiscord     = new();
         private readonly object _lock = new();
+        private readonly ILogger<RoomService> _logger;
+
+        public RoomService(ILogger<RoomService> logger)
+        {
+            _logger = logger;
+        }
 
         public void AddPlayer(string connectionId, string playerName, string gameId, string discordUsername)
         {
             lock (_lock)
             {
                 if (!_rooms.ContainsKey(gameId))
+                {
                     _rooms[gameId] = new();
-                _connectionToPlayer[connectionId]  = playerName;
-                _playerToConnection[playerName]    = connectionId;
-                _connectionToGame[connectionId]    = gameId;
-                _playerToDiscord[playerName]       = discordUsername; // NOUVEAU
-                _rooms[gameId][playerName]         = (0f, 0f);
+                    _logger.LogInformation("[Room] Room {GameId} créée", gameId);
+                }
+
+                _connectionToPlayer[connectionId] = playerName;
+                _playerToConnection[playerName]   = connectionId;
+                _connectionToGame[connectionId]   = gameId;
+                _playerToDiscord[playerName]      = discordUsername;
+                _rooms[gameId][playerName]        = (0f, 0f);
+
+                _logger.LogInformation("[Room] {Player} ({Discord}) a rejoint {GameId}", playerName, discordUsername, gameId);
             }
         }
 
@@ -28,16 +42,59 @@
             lock (_lock)
             {
                 if (!_connectionToPlayer.TryGetValue(connectionId, out var playerName)) return;
+
                 _connectionToPlayer.Remove(connectionId);
                 _playerToConnection.Remove(playerName);
                 _connectionToGame.Remove(connectionId);
-                _playerToDiscord.Remove(playerName); // NOUVEAU
+                _playerToDiscord.Remove(playerName);
 
                 foreach (var room in _rooms.Values)
                     room.Remove(playerName);
 
-                foreach (var emptyRoom in _rooms.Where(r => r.Value.Count == 0).ToList())
+                var emptyRooms = _rooms.Where(r => r.Value.Count == 0).ToList();
+                foreach (var emptyRoom in emptyRooms)
+                {
                     _rooms.Remove(emptyRoom.Key);
+                    _logger.LogInformation("[Room] Room {GameId} supprimée (vide)", emptyRoom.Key);
+                }
+
+                _logger.LogInformation("[Room] {Player} a quitté", playerName);
+            }
+        }
+
+        public void UpdatePosition(string gameId, string playerName, float x, float y)
+        {
+            lock (_lock)
+            {
+                if (!_rooms.ContainsKey(gameId)) return;
+                _rooms[gameId][playerName] = (x, y);
+            }
+        }
+
+        public Dictionary<string, (float x, float y)> GetPositions(string gameId)
+        {
+            lock (_lock)
+            {
+                if (!_rooms.TryGetValue(gameId, out var room)) return new();
+                return new(room);
+            }
+        }
+
+        public string? GetConnectionId(string playerName)
+        {
+            lock (_lock)
+            {
+                _playerToConnection.TryGetValue(playerName, out var connId);
+                return connId;
+            }
+        }
+
+        public string? GetDiscordUsername(string playerName)
+        {
+            lock (_lock)
+            {
+                _playerToDiscord.TryGetValue(playerName, out var discord);
+                return discord;
             }
         }
 
@@ -50,29 +107,6 @@
             }
         }
 
-        public List<string> GetPlayerNames(string gameId)
-        {
-            lock (_lock)
-            {
-                if (!_rooms.TryGetValue(gameId, out var room)) return new();
-                return room.Keys.ToList();
-            }
-        }
-
-        // NOUVEAU — retourne le mapping LoL → Discord pour tous les joueurs de la room
-        public Dictionary<string, string> GetDiscordMapping(string gameId)
-        {
-            lock (_lock)
-            {
-                if (!_rooms.TryGetValue(gameId, out var room)) return new();
-                var mapping = new Dictionary<string, string>();
-                foreach (var playerName in room.Keys)
-                    if (_playerToDiscord.TryGetValue(playerName, out var discord) && discord != "")
-                        mapping[playerName] = discord;
-                return mapping;
-            }
-        }
-
         public string? GetGameId(string connectionId)
         {
             lock (_lock)
@@ -80,70 +114,6 @@
                 _connectionToGame.TryGetValue(connectionId, out var gameId);
                 return gameId;
             }
-        }
-
-        public void UpdatePosition(string gameId, string playerName, float x, float y)
-        {
-            lock (_lock)
-            {
-                if (!_rooms.ContainsKey(gameId))
-                    _rooms[gameId] = new();
-                _rooms[gameId][playerName] = (x, y);
-            }
-        }
-
-        public Dictionary<string, (string connectionId, Dictionary<string, float> volumes)> ComputeVolumes(string gameId)
-        {
-            Dictionary<string, (float x, float y)> positions;
-            Dictionary<string, string> connections;
-
-            lock (_lock)
-            {
-                if (!_rooms.TryGetValue(gameId, out var room)) return new();
-                positions   = new(room);
-                connections = new(_playerToConnection);
-            }
-
-            // LOG DIAGNOSTIC
-            Console.WriteLine($"[VOLUMES] Room {gameId} — {positions.Count} joueur(s) : {string.Join(", ", positions.Select(p => $"{p.Key}=({p.Value.x:F0},{p.Value.y:F0})"))}");
-
-            var result = new Dictionary<string, (string, Dictionary<string, float>)>();
-
-            foreach (var listener in positions)
-            {
-                if (!connections.TryGetValue(listener.Key, out var connId))
-                {
-                    Console.WriteLine($"[VOLUMES] SKIP {listener.Key} — pas de connectionId trouvé dans _playerToConnection");
-                    continue;
-                }
-
-                var volumes = new Dictionary<string, float>();
-                foreach (var speaker in positions)
-                {
-                    if (speaker.Key == listener.Key) continue;
-                    var dist = MathF.Sqrt(MathF.Pow(listener.Value.x - speaker.Value.x, 2) + MathF.Pow(listener.Value.y - speaker.Value.y, 2));
-                    var vol  = CalculateVolume(listener.Value, speaker.Value);
-                    Console.WriteLine($"[VOLUMES] {listener.Key} entend {speaker.Key} : distance={dist:F0} → volume={vol:F3}");
-                    volumes[speaker.Key] = vol;
-                }
-
-                result[listener.Key] = (connId, volumes);
-            }
-
-            return result;
-        }
-
-        private static float CalculateVolume(
-            (float x, float y) listener,
-            (float x, float y) speaker)
-        {
-            const float maxRange = 3500f;
-            var distance = MathF.Sqrt(
-                MathF.Pow(listener.x - speaker.x, 2) +
-                MathF.Pow(listener.y - speaker.y, 2));
-            if (distance >= maxRange) return 0f;
-            var volume = 1f - (distance / maxRange);
-            return MathF.Pow(volume, 2);
         }
     }
 }
