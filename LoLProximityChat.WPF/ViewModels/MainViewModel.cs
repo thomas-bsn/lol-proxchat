@@ -33,23 +33,29 @@ namespace LoLProximityChat.WPF.ViewModels
 
         public async Task JoinTestRoomAsync()
         {
-            var connected = await _orchestrator.JoinAndConnectAsync(
-                roomId:   "testroom123",
-                playerId: "Joueur1",
-                ct:       CancellationToken.None
-            );
-            
-            await Task.Delay(500);
+            var cts = new CancellationTokenSource();
 
-            while (true)
+            await _orchestrator.JoinAndConnectAsync(
+                roomId: "testroom123",
+                playerId: "Joueur1",
+                ct: cts.Token
+            );
+
+            _ = RunPositionLoop(cts.Token);
+        }
+        
+        private async Task RunPositionLoop(CancellationToken ct)
+        {
+            while (!ct.IsCancellationRequested)
             {
                 await _orchestrator.SendPositionAsync(new PlayerPosition
                 {
                     SummonerName = "Joueur1",
-                    X            = 7000f,
-                    Y            = 7000f
-                });
-                await Task.Delay(1000);
+                    X = 7000f,
+                    Y = 7000f
+                }, ct);
+
+                await Task.Delay(1000, ct);
             }
         }
     }

@@ -48,32 +48,30 @@ namespace LoLProximityChat.Core
             OnStateChanged?.Invoke(_state);
         }
 
-        public async Task<bool> JoinAndConnectAsync(string roomId, string playerId, CancellationToken ct)
+        public async Task JoinAndConnectAsync(string roomId, string playerId, CancellationToken ct)
         {
-            if (_state != OrchestratorState.Idle) return false;
+            if (_state != OrchestratorState.Idle) return;
 
             SetState(OrchestratorState.Disconnected); // → PENDING
 
             var token = await WaitForServerAsync(roomId, playerId, ct);
-            if (token is null) return false;
+            if (token is null) return;
 
             var discordOk = await _discordRpcService.ConnectAsync(ct);
             if (!discordOk)
             {
                 SetState(OrchestratorState.Idle);
-                return false;
+                return;
             }
 
             try
             {
                 await _socketService.ConnectAsync(token, ct);
                 SetState(OrchestratorState.InGame);
-                return true;
             }
             catch
             {
                 SetState(OrchestratorState.Disconnected);
-                return false;
             }
         }
         
