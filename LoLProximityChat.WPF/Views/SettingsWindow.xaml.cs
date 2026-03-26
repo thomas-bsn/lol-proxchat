@@ -1,4 +1,6 @@
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
 using LoLProximityChat.Core.Core;
 using LoLProximityChat.WPF.ViewModels;
 
@@ -25,6 +27,19 @@ namespace LoLProximityChat.WPF.Views
             }
 
             DialogResult = true;
+            Close();
+        }
+        
+        private void OnUsernameChanged(object sender, TextChangedEventArgs e)
+        {
+            PlaceholderText.Visibility =
+                string.IsNullOrWhiteSpace(DiscordUsernameBox.Text)
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+        }
+        
+        private void OnCloseClick(object sender, MouseButtonEventArgs e)
+        {
             Close();
         }
     }
